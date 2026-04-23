@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KPI Dashboard Ultra - v7.0 (Firebase)</title>
+    <title>KPI Dashboard Pro - v8.0 (Firebase + Autocompletado)</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         
         const firebaseConfig = {
             apiKey: "AIzaSyCQvF990R2rztUtyPUVb1csA0PU-j38X2g",
@@ -23,6 +24,7 @@
         
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+        const auth = getAuth(app);
         
         window.db = db;
         window.collection = collection;
@@ -33,14 +35,15 @@
         window.doc = doc;
         window.query = query;
         window.orderBy = orderBy;
+        window.where = where;
     </script>
     
     <style>
-        :root { --primary: #2563eb; --secondary: #64748b; --success: #22c55e; --danger: #ef4444; --bg: #f8fafc; --dark: #1e293b; }
+        :root { --primary: #2563eb; --secondary: #64748b; --success: #22c55e; --danger: #ef4444; --warning: #f59e0b; --bg: #f8fafc; --dark: #1e293b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: var(--dark); }
-        .container { max-width: 1300px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        .container { max-width: 1400px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
         
-        .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; flex-wrap: wrap; }
         .tab-btn { padding: 12px 24px; border: none; background: none; cursor: pointer; font-weight: 600; color: var(--secondary); transition: 0.3s; }
         .tab-btn.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
 
@@ -48,7 +51,6 @@
         .content.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* Estructura Vertical de Registro */
         .registro-vertical { max-width: 500px; background: #f8fafc; padding: 25px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px; }
         .form-section { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #e2e8f0; }
         .form-section:last-child { border-bottom: none; }
@@ -59,13 +61,13 @@
         .input-row label { min-width: 60px; font-size: 13px; color: var(--secondary); }
         
         input, select { padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; width: 100%; box-sizing: border-box; }
-        input:focus { outline: none; border-color: var(--primary); ring: 2px var(--primary); }
+        input:focus { outline: none; border-color: var(--primary); }
 
         .btn { padding: 12px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; display: flex; align-items: center; gap: 8px; justify-content: center;}
         .btn-primary { background: var(--primary); color: white; width: 100%; max-width: 500px; }
         .btn-success { background: var(--success); color: white; }
         .btn-export { background: #475569; color: white; }
-        .btn-delete { background: var(--danger); color: white; padding: 5px 10px; font-size: 11px; }
+        .btn-warning { background: var(--warning); color: white; }
 
         .table-container { overflow-x: auto; max-height: 500px; border: 1px solid #e2e8f0; border-radius: 8px; margin-top: 10px; }
         table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1000px; }
@@ -73,23 +75,32 @@
         td { padding: 12px; border-bottom: 1px solid #f1f5f9; text-align: center; }
         .goal-tag { font-size: 11px; color: #64748b; background: #f1f5f9; padding: 2px 6px; border-radius: 10px; }
 
-        .chart-container { margin-top: 30px; height: 450px; background: #fff; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; }
+        .chart-container { margin-top: 20px; height: 500px; background: #fff; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; }
         
         .loading { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 1000; }
         .sync-status { font-size: 12px; color: var(--success); margin-top: 5px; }
         .action-buttons { display: flex; gap: 5px; justify-content: center; }
         .edit-btn { background: var(--primary); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
         .delete-btn { background: var(--danger); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
+        
+        .metric-buttons { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .metric-btn { padding: 10px 20px; border: 2px solid var(--primary); background: white; color: var(--primary); border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .metric-btn.active { background: var(--primary); color: white; }
+        
+        .filter-group { display: flex; gap: 15px; align-items: flex-end; margin-bottom: 20px; flex-wrap: wrap; }
+        .filter-item { display: flex; flex-direction: column; gap: 5px; }
+        .filter-item label { font-size: 12px; font-weight: bold; color: var(--secondary); }
+        .filter-item select, .filter-item input { width: 150px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
         <div>
             <h1 style="margin:0; color: var(--primary);">KPI Dashboard Pro</h1>
             <p style="margin:0; color: var(--secondary);">Registro y Análisis de Cierre (Firebase)</p>
-            <div class="sync-status" id="sync-status">✅ Conectado a Firebase Firestore</div>
+            <div class="sync-status" id="sync-status">🔄 Conectando a Firebase...</div>
         </div>
         <div style="display: flex; gap: 10px;">
             <button class="btn btn-export" onclick="exportarExcel()">📥 Exportar Respaldo</button>
@@ -98,20 +109,23 @@
     </div>
     
     <div class="tabs">
-        <button class="tab-btn active" onclick="openTab('registro')">Registro Diario</button>
-        <button class="tab-btn" onclick="openTab('importar')">Base de Datos</button>
-        <button class="tab-btn" onclick="openTab('comparativa')">Análisis Comparativo</button>
+        <button class="tab-btn active" onclick="openTab('registro')">📝 Registro Diario</button>
+        <button class="tab-btn" onclick="openTab('importar')">🗄️ Base de Datos</button>
+        <button class="tab-btn" onclick="openTab('comparativa')">📊 Comparativa de Periodos</button>
+        <button class="tab-btn" onclick="openTab('analisis')">📈 Análisis por Métrica</button>
     </div>
 
+    <!-- Pestaña Registro -->
     <div id="registro" class="content active">
         <div class="registro-vertical">
             <div class="form-section">
-                <label class="section-title">Fecha de Registro</label>
-                <input type="date" id="reg-fecha">
+                <label class="section-title">📅 Fecha de Registro</label>
+                <input type="date" id="reg-fecha" onchange="autoCompletarMetas()">
+                <small style="color: var(--secondary);">✨ Al seleccionar fecha, se autocompletan las metas del último registro</small>
             </div>
 
             <div class="form-section">
-                <label class="section-title">Instalaciones</label>
+                <label class="section-title">🏗️ Instalaciones</label>
                 <div class="input-group">
                     <div class="input-row"><label>Real:</label><input type="number" id="r-inst" placeholder="0"></div>
                     <div class="input-row"><label>Meta:</label><input type="number" id="m-inst" placeholder="0"></div>
@@ -119,7 +133,7 @@
             </div>
 
             <div class="form-section">
-                <label class="section-title">Crecimiento</label>
+                <label class="section-title">📈 Crecimiento</label>
                 <div class="input-group">
                     <div class="input-row"><label>Real:</label><input type="number" id="r-crec" placeholder="0"></div>
                     <div class="input-row"><label>Meta:</label><input type="number" id="m-crec" placeholder="0"></div>
@@ -127,7 +141,7 @@
             </div>
 
             <div class="form-section">
-                <label class="section-title">Bajas</label>
+                <label class="section-title">⚠️ Bajas</label>
                 <div class="input-group">
                     <div class="input-row"><label>Real:</label><input type="number" id="r-bajas" placeholder="0"></div>
                     <div class="input-row"><label>Meta:</label><input type="number" id="m-bajas" placeholder="0"></div>
@@ -135,7 +149,7 @@
             </div>
 
             <div class="form-section">
-                <label class="section-title">Perdidos</label>
+                <label class="section-title">📉 Clientes Perdidos</label>
                 <div class="input-group">
                     <div class="input-row"><label>Real:</label><input type="number" id="r-perd" placeholder="0"></div>
                     <div class="input-row"><label>Meta:</label><input type="number" id="m-perd" placeholder="0"></div>
@@ -145,6 +159,7 @@
         <button class="btn btn-primary" onclick="guardarEnFirebase()">💾 Guardar en Firebase</button>
     </div>
 
+    <!-- Pestaña Base de Datos -->
     <div id="importar" class="content">
         <div style="background: #f1f5f9; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
             <input type="file" id="excel-file" accept=".xlsx, .xls">
@@ -168,10 +183,11 @@
         </div>
     </div>
 
+    <!-- Pestaña Comparativa de Periodos (original) -->
     <div id="comparativa" class="content">
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
             <div class="form-group"><label>Comparar por:</label>
-                <select id="tipo-comp" onchange="toggleInputs()">
+                <select id="tipo-comp" onchange="toggleInputsComparativa()">
                     <option value="dia">Día Exacto</option>
                     <option value="mes">Mes (Cierre)</option>
                     <option value="año">Año (Cierre)</option>
@@ -189,9 +205,51 @@
             </div>
         </div>
         <button class="btn btn-success" style="width:100%" onclick="ejecutarComparativa()">📊 Comparar Cierres de Periodo</button>
-
         <div class="chart-container">
             <canvas id="graficaComparativa"></canvas>
+        </div>
+    </div>
+
+    <!-- Pestaña Análisis por Métrica (NUEVA) -->
+    <div id="analisis" class="content">
+        <div class="metric-buttons">
+            <button class="metric-btn active" onclick="cambiarMetrica('instalaciones')">🏗️ Instalaciones</button>
+            <button class="metric-btn" onclick="cambiarMetrica('crecimiento')">📈 Crecimiento</button>
+            <button class="metric-btn" onclick="cambiarMetrica('bajas')">⚠️ Bajas</button>
+            <button class="metric-btn" onclick="cambiarMetrica('perdidos')">📉 Clientes Perdidos</button>
+        </div>
+        
+        <div class="filter-group">
+            <div class="filter-item">
+                <label>Agrupar por:</label>
+                <select id="agrupacion" onchange="actualizarGraficaAnalisis()">
+                    <option value="dia">Día</option>
+                    <option value="mes" selected>Mes</option>
+                    <option value="año">Año</option>
+                </select>
+            </div>
+            <div class="filter-item">
+                <label>Período específico:</label>
+                <select id="periodoSelector" onchange="actualizarGraficaAnalisis()">
+                    <option value="todo">Todo el historial</option>
+                    <option value="año">Año específico</option>
+                    <option value="rango">Rango de fechas</option>
+                </select>
+            </div>
+            <div class="filter-item" id="añoSelector" style="display:none;">
+                <label>Año:</label>
+                <input type="number" id="añoFiltro" placeholder="2026" onchange="actualizarGraficaAnalisis()">
+            </div>
+            <div class="filter-item" id="rangoSelector" style="display:none;">
+                <label>Desde:</label>
+                <input type="date" id="fechaDesde" onchange="actualizarGraficaAnalisis()">
+                <label>Hasta:</label>
+                <input type="date" id="fechaHasta" onchange="actualizarGraficaAnalisis()">
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="graficaAnalisis"></canvas>
         </div>
     </div>
 </div>
@@ -202,24 +260,70 @@
 
 <script type="module">
     // Variables globales
-    let dbData = []; // Datos locales para renderizado rápido
+    let dbData = [];
     let myChart = null;
-    let currentEditId = null;
+    let analisisChart = null;
+    let metricaActual = 'instalaciones';
     
-    // Función para mostrar/ocultar loading
-    function showLoading() {
-        document.getElementById('loading').style.display = 'block';
-    }
+    // Autenticación
+    function showLoading() { document.getElementById('loading').style.display = 'block'; }
+    function hideLoading() { document.getElementById('loading').style.display = 'none'; }
     
-    function hideLoading() {
-        document.getElementById('loading').style.display = 'none';
-    }
+    const auth = window.auth;
+    const db = window.db;
     
-    // Cargar todos los datos desde Firebase
+    signInAnonymously(auth)
+        .then(() => {
+            document.getElementById('sync-status').innerHTML = '✅ Conectado a Firebase';
+            cargarDesdeFirebase();
+        })
+        .catch((error) => {
+            console.error("Error de autenticación:", error);
+            document.getElementById('sync-status').innerHTML = '❌ Error de conexión - Revisa reglas de Firebase';
+            hideLoading();
+        });
+    
+    // AUTOCOMPLETADO DE METAS
+    window.autoCompletarMetas = async function() {
+        const fechaSeleccionada = document.getElementById('reg-fecha').value;
+        if(!fechaSeleccionada) return;
+        
+        try {
+            // Buscar el registro más reciente anterior a la fecha seleccionada
+            const q = query(collection(db, "kpi_dashboard"), orderBy("fecha", "desc"));
+            const querySnapshot = await getDocs(q);
+            let ultimoRegistro = null;
+            let fechaUltimo = null;
+            
+            querySnapshot.forEach((doc) => {
+                const fechaDoc = doc.data().fecha;
+                if(fechaDoc < fechaSeleccionada) {
+                    if(!fechaUltimo || fechaDoc > fechaUltimo) {
+                        fechaUltimo = fechaDoc;
+                        ultimoRegistro = doc.data();
+                    }
+                }
+            });
+            
+            if(ultimoRegistro) {
+                document.getElementById('m-inst').value = ultimoRegistro.obj_inst || 0;
+                document.getElementById('m-crec').value = ultimoRegistro.obj_crecimiento || 0;
+                document.getElementById('m-bajas').value = ultimoRegistro.obj_bajas || 0;
+                document.getElementById('m-perd').value = ultimoRegistro.obj_perdidos || 0;
+                console.log("Metas autocompletadas desde:", fechaUltimo);
+            } else {
+                console.log("No se encontró registro previo para autocompletar");
+            }
+        } catch (error) {
+            console.error("Error en autocompletado:", error);
+        }
+    };
+    
+    // CRUD Firebase
     window.cargarDesdeFirebase = async function() {
         showLoading();
         try {
-            const q = query(collection(window.db, "kpi_dashboard"), orderBy("fecha", "desc"));
+            const q = query(collection(db, "kpi_dashboard"), orderBy("fecha", "desc"));
             const querySnapshot = await getDocs(q);
             dbData = [];
             querySnapshot.forEach((doc) => {
@@ -227,16 +331,19 @@
             });
             renderTable();
             hideLoading();
+            // Si estamos en la pestaña de análisis, actualizar gráfica
+            if(document.getElementById('analisis').classList.contains('active')) {
+                actualizarGraficaAnalisis();
+            }
             return dbData;
         } catch (error) {
             console.error("Error cargando datos:", error);
-            alert("Error al cargar datos de Firebase: " + error.message);
+            alert("Error al cargar datos: " + error.message);
             hideLoading();
             return [];
         }
     };
     
-    // Guardar o actualizar en Firebase
     window.guardarEnFirebase = async function() {
         const fecha = document.getElementById('reg-fecha').value;
         if(!fecha) return alert("Por favor selecciona una fecha.");
@@ -255,8 +362,7 @@
         
         showLoading();
         try {
-            // Verificar si ya existe un registro con esa fecha
-            const q = query(collection(window.db, "kpi_dashboard"));
+            const q = query(collection(db, "kpi_dashboard"));
             const querySnapshot = await getDocs(q);
             let existingDoc = null;
             
@@ -267,42 +373,35 @@
             });
             
             if(existingDoc) {
-                // Actualizar
-                const docRef = doc(window.db, "kpi_dashboard", existingDoc.id);
+                const docRef = doc(db, "kpi_dashboard", existingDoc.id);
                 await updateDoc(docRef, row);
                 alert("¡Registro actualizado correctamente!");
             } else {
-                // Crear nuevo
-                await addDoc(collection(window.db, "kpi_dashboard"), row);
+                await addDoc(collection(db, "kpi_dashboard"), row);
                 alert("¡Registro guardado correctamente!");
             }
             
             await window.cargarDesdeFirebase();
             
-            // Limpiar formulario
+            // Limpiar reales, mantener metas
             document.getElementById('r-inst').value = '';
-            document.getElementById('m-inst').value = '';
             document.getElementById('r-crec').value = '';
-            document.getElementById('m-crec').value = '';
             document.getElementById('r-bajas').value = '';
-            document.getElementById('m-bajas').value = '';
             document.getElementById('r-perd').value = '';
-            document.getElementById('m-perd').value = '';
             
             hideLoading();
         } catch (error) {
             console.error("Error guardando:", error);
-            alert("Error al guardar en Firebase: " + error.message);
+            alert("Error al guardar: " + error.message);
             hideLoading();
         }
     };
     
-    // Eliminar registro
     window.eliminarRegistro = async function(id) {
         if(confirm("¿Estás seguro de eliminar este registro?")) {
             showLoading();
             try {
-                await deleteDoc(doc(window.db, "kpi_dashboard", id));
+                await deleteDoc(doc(db, "kpi_dashboard", id));
                 alert("Registro eliminado");
                 await window.cargarDesdeFirebase();
                 hideLoading();
@@ -314,7 +413,6 @@
         }
     };
     
-    // Editar registro (cargar en el formulario)
     window.editarRegistro = function(registro) {
         document.getElementById('reg-fecha').value = registro.fecha;
         document.getElementById('r-inst').value = registro.inst;
@@ -326,13 +424,12 @@
         document.getElementById('r-perd').value = registro.perdidos;
         document.getElementById('m-perd').value = registro.obj_perdidos;
         
-        // Cambiar a la pestaña de registro
         openTab('registro');
-        document.querySelector('.tab-btn.active').classList.remove('active');
-        document.querySelector('.tab-btn').classList.add('active');
+        const btns = document.querySelectorAll('.tab-btn');
+        btns.forEach(btn => btn.classList.remove('active'));
+        btns[0].classList.add('active');
     };
     
-    // Renderizar tabla
     function renderTable() {
         document.getElementById('contador-filas').innerHTML = `${dbData.length} Registros`;
         document.getElementById('cuerpo-tabla').innerHTML = dbData.map(d => `
@@ -343,121 +440,78 @@
                 <td>${d.bajas} <span class="goal-tag">M: ${d.obj_bajas}</span></td>
                 <td>${d.perdidos} <span class="goal-tag">M: ${d.obj_perdidos}</span></td>
                 <td class="action-buttons">
-                    <button class="edit-btn" onclick="editarRegistro(${JSON.stringify(d).replace(/"/g, '&quot;')})">✏️ Editar</button>
+                    <button class="edit-btn" onclick='editarRegistro(${JSON.stringify(d)})'>✏️ Editar</button>
                     <button class="delete-btn" onclick="eliminarRegistro('${d.id}')">🗑️ Eliminar</button>
                 </td>
             </tr>
         `).join('');
     }
     
-    // Sincronizar desde localStorage (migración)
     window.sincronizarFromLocal = async function() {
         const localData = localStorage.getItem('it_pro_dashboard_v6');
-        if(!localData) {
-            alert("No hay datos en localStorage para sincronizar");
-            return;
-        }
-        
+        if(!localData) return alert("No hay datos en localStorage");
         const data = JSON.parse(localData);
-        if(data.length === 0) {
-            alert("No hay datos para sincronizar");
-            return;
-        }
+        if(data.length === 0) return alert("No hay datos");
         
-        if(confirm(`Se sincronizarán ${data.length} registros a Firebase. ¿Continuar?`)) {
+        if(confirm(`Sincronizar ${data.length} registros a Firebase?`)) {
             showLoading();
             try {
                 for(const item of data) {
-                    // Verificar si ya existe
-                    const q = query(collection(window.db, "kpi_dashboard"));
+                    const q = query(collection(db, "kpi_dashboard"));
                     const querySnapshot = await getDocs(q);
                     let exists = false;
-                    
                     querySnapshot.forEach((doc) => {
-                        if(doc.data().fecha === item.fecha) {
-                            exists = true;
-                        }
+                        if(doc.data().fecha === item.fecha) exists = true;
                     });
-                    
-                    if(!exists) {
-                        await addDoc(collection(window.db, "kpi_dashboard"), item);
-                    }
+                    if(!exists) await addDoc(collection(db, "kpi_dashboard"), item);
                 }
                 await window.cargarDesdeFirebase();
                 alert("Sincronización completada");
                 hideLoading();
             } catch (error) {
-                console.error("Error sincronizando:", error);
-                alert("Error en sincronización: " + error.message);
+                alert("Error: " + error.message);
                 hideLoading();
             }
         }
     };
     
-    // Importar desde Excel
     document.getElementById('excel-file').addEventListener('change', function(e) {
         const reader = new FileReader();
         reader.onload = async (e) => {
             showLoading();
             const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
-            let nuevosRegistros = 0;
-            
+            let nuevos = 0;
             for(const name of workbook.SheetNames) {
                 const json = XLSX.utils.sheet_to_json(workbook.Sheets[name]);
                 for(const r of json) {
                     let f = r['Fecha'] instanceof Date ? r['Fecha'].toISOString().split('T')[0] : r['Fecha'];
                     if(!f) continue;
-                    
                     const data = {
-                        fecha: f,
-                        inst: Number(r['Instalaciones'] || 0),
-                        obj_inst: Number(r['Objetivo Instalación'] || 0),
-                        perdidos: Number(r['Clientes Perdidos'] || 0),
-                        obj_perdidos: Number(r['Objetivo Clientes Perdidos'] || 0),
-                        bajas: Number(r['Bajas Rezagas Canceladas'] || 0),
-                        obj_bajas: Number(r['Objetivo Bajas'] || 0),
-                        crecimiento: Number(r['Crecimiento'] || 0),
-                        obj_crecimiento: Number(r['Objetivo Crecimiento'] || 0)
+                        fecha: f, inst: Number(r['Instalaciones'] || 0), obj_inst: Number(r['Objetivo Instalación'] || 0),
+                        perdidos: Number(r['Clientes Perdidos'] || 0), obj_perdidos: Number(r['Objetivo Clientes Perdidos'] || 0),
+                        bajas: Number(r['Bajas Rezagas Canceladas'] || 0), obj_bajas: Number(r['Objetivo Bajas'] || 0),
+                        crecimiento: Number(r['Crecimiento'] || 0), obj_crecimiento: Number(r['Objetivo Crecimiento'] || 0)
                     };
-                    
-                    // Verificar si ya existe
-                    const q = query(collection(window.db, "kpi_dashboard"));
-                    const querySnapshot = await getDocs(q);
+                    const q = query(collection(db, "kpi_dashboard"));
+                    const snapshot = await getDocs(q);
                     let exists = false;
-                    
-                    querySnapshot.forEach((doc) => {
-                        if(doc.data().fecha === f) {
-                            exists = true;
-                        }
-                    });
-                    
-                    if(!exists) {
-                        await addDoc(collection(window.db, "kpi_dashboard"), data);
-                        nuevosRegistros++;
-                    }
+                    snapshot.forEach((doc) => { if(doc.data().fecha === f) exists = true; });
+                    if(!exists) { await addDoc(collection(db, "kpi_dashboard"), data); nuevos++; }
                 }
             }
-            
             await window.cargarDesdeFirebase();
-            alert(`Importación completada: ${nuevosRegistros} nuevos registros`);
+            alert(`Importados ${nuevos} nuevos registros`);
             hideLoading();
         };
         reader.readAsArrayBuffer(e.target.files[0]);
     });
     
-    // Exportar a Excel
     window.exportarExcel = function() {
         const exportData = dbData.map(({ id, ...rest }) => rest);
         const ws = XLSX.utils.json_to_sheet(exportData);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Datos");
+        XLSX.utils.book_append_sheet(wb, ws, "KPI_Data");
         XLSX.writeFile(wb, `KPI_Backup_${new Date().toISOString().split('T')[0]}.xlsx`);
-    };
-    
-    // Cargar datos iniciales
-    window.onload = () => {
-        document.getElementById('reg-fecha').value = new Date().toISOString().split('T')[0];
-        window.cargarDesdeFirebase();
     };
     
     window.openTab = function(id) {
@@ -465,13 +519,15 @@
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.getElementById(id).classList.add('active');
         if(event && event.currentTarget) event.currentTarget.classList.add('active');
+        
+        if(id === 'analisis') actualizarGraficaAnalisis();
     };
     
-    window.toggleInputs = function() {
+    window.toggleInputsComparativa = function() {
         const tipo = document.getElementById('tipo-comp').value;
-        document.querySelectorAll('.in-dia').forEach(e => e.style.display = tipo === 'dia' ? 'block' : 'none');
-        document.querySelectorAll('.in-mes').forEach(e => e.style.display = tipo === 'mes' ? 'block' : 'none');
-        document.querySelectorAll('.in-año').forEach(e => e.style.display = tipo === 'año' ? 'block' : 'none');
+        document.querySelectorAll('#comparativa .in-dia').forEach(e => e.style.display = tipo === 'dia' ? 'block' : 'none');
+        document.querySelectorAll('#comparativa .in-mes').forEach(e => e.style.display = tipo === 'mes' ? 'block' : 'none');
+        document.querySelectorAll('#comparativa .in-año').forEach(e => e.style.display = tipo === 'año' ? 'block' : 'none');
     };
     
     window.ejecutarComparativa = function() {
@@ -480,20 +536,13 @@
         const labels = ['Instalaciones', 'Crecimiento', 'Bajas', 'C. Perdidos'];
         
         const getUltimoValor = (pref) => {
-            let filtrados = [];
             const val = document.getElementById(tipo === 'dia' ? 'fecha-'+pref : (tipo === 'mes' ? 'mes-'+pref : 'año-'+pref)).value;
             if(!val) return { real: [0,0,0,0], meta: [0,0,0,0] };
-            
-            filtrados = dbData.filter(d => d.fecha.startsWith(val));
+            const filtrados = dbData.filter(d => d.fecha.startsWith(val));
             if(filtrados.length === 0) return { real: [0,0,0,0], meta: [0,0,0,0] };
-            
             filtrados.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
             const ultimo = filtrados[filtrados.length - 1];
-            
-            return {
-                real: metrics.map(m => ultimo[m]),
-                meta: metrics.map(m => ultimo['obj_'+m])
-            };
+            return { real: metrics.map(m => ultimo[m]), meta: metrics.map(m => ultimo['obj_'+m]) };
         };
         
         const dataA = getUltimoValor('a');
@@ -501,27 +550,213 @@
         
         if(myChart) myChart.destroy();
         const ctx = document.getElementById('graficaComparativa').getContext('2d');
-        
         myChart = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: labels,
                 datasets: [
                     { label: 'Periodo A (Cierre)', data: dataA.real, backgroundColor: '#2563eb' },
-                    { label: 'Meta A', data: dataA.meta, type: 'line', borderColor: '#93c5fd', borderDash: [5, 5], borderWidth: 2, fill: false, tension: 0.1 },
+                    { label: 'Meta A', data: dataA.meta, type: 'line', borderColor: '#93c5fd', borderDash: [5, 5], borderWidth: 2, fill: false },
                     { label: 'Periodo B (Cierre)', data: dataB.real, backgroundColor: '#22c55e' },
-                    { label: 'Meta B', data: dataB.meta, type: 'line', borderColor: '#86efac', borderDash: [5, 5], borderWidth: 2, fill: false, tension: 0.1 }
+                    { label: 'Meta B', data: dataB.meta, type: 'line', borderColor: '#86efac', borderDash: [5, 5], borderWidth: 2, fill: false }
                 ]
             },
-            options: { 
-                responsive: true, 
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    };
+    
+    // NUEVA FUNCIONALIDAD: Gráficas por métrica
+    window.cambiarMetrica = function(metrica) {
+        metricaActual = metrica;
+        document.querySelectorAll('.metric-btn').forEach(btn => btn.classList.remove('active'));
+        event.currentTarget.classList.add('active');
+        actualizarGraficaAnalisis();
+    };
+    
+    function configurarSelectorPeriodo() {
+        const selector = document.getElementById('periodoSelector');
+        const añoDiv = document.getElementById('añoSelector');
+        const rangoDiv = document.getElementById('rangoSelector');
+        
+        if(selector.value === 'año') {
+            añoDiv.style.display = 'flex';
+            rangoDiv.style.display = 'none';
+        } else if(selector.value === 'rango') {
+            añoDiv.style.display = 'none';
+            rangoDiv.style.display = 'flex';
+        } else {
+            añoDiv.style.display = 'none';
+            rangoDiv.style.display = 'none';
+        }
+    }
+    
+    function agruparPorPeriodo(data, agrupacion) {
+        const grupos = {};
+        
+        data.forEach(item => {
+            const fecha = new Date(item.fecha);
+            let key;
+            if(agrupacion === 'dia') {
+                key = item.fecha;
+            } else if(agrupacion === 'mes') {
+                key = `${fecha.getFullYear()}-${String(fecha.getMonth()+1).padStart(2,'0')}`;
+            } else {
+                key = `${fecha.getFullYear()}`;
+            }
+            
+            if(!grupos[key]) {
+                grupos[key] = { suma: 0, count: 0, fechas: [] };
+            }
+            grupos[key].suma += item.valor;
+            grupos[key].count++;
+            grupos[key].fechas.push(item.fecha);
+        });
+        
+        // Convertir a array ordenado
+        const resultado = Object.keys(grupos).sort().map(key => ({
+            periodo: key,
+            valor: agrupacion === 'dia' ? grupos[key].suma : 
+                   (agrupacion === 'mes' ? grupos[key].suma : grupos[key].suma)
+        }));
+        
+        return resultado;
+    }
+    
+    window.actualizarGraficaAnalisis = function() {
+        if(dbData.length === 0) return;
+        
+        const agrupacion = document.getElementById('agrupacion').value;
+        const periodoSelector = document.getElementById('periodoSelector').value;
+        const añoFiltro = parseInt(document.getElementById('añoFiltro').value);
+        const fechaDesde = document.getElementById('fechaDesde').value;
+        const fechaHasta = document.getElementById('fechaHasta').value;
+        
+        configurarSelectorPeriodo();
+        
+        // Mapear métrica a campo
+        let campoReal, campoMeta, titulo;
+        switch(metricaActual) {
+            case 'instalaciones':
+                campoReal = 'inst';
+                campoMeta = 'obj_inst';
+                titulo = 'Instalaciones';
+                break;
+            case 'crecimiento':
+                campoReal = 'crecimiento';
+                campoMeta = 'obj_crecimiento';
+                titulo = 'Crecimiento';
+                break;
+            case 'bajas':
+                campoReal = 'bajas';
+                campoMeta = 'obj_bajas';
+                titulo = 'Bajas';
+                break;
+            case 'perdidos':
+                campoReal = 'perdidos';
+                campoMeta = 'obj_perdidos';
+                titulo = 'Clientes Perdidos';
+                break;
+        }
+        
+        // Filtrar datos
+        let datosFiltrados = dbData.map(d => ({
+            fecha: d.fecha,
+            valor: d[campoReal],
+            meta: d[campoMeta]
+        }));
+        
+        // Aplicar filtros de período
+        if(periodoSelector === 'año' && añoFiltro) {
+            datosFiltrados = datosFiltrados.filter(d => d.fecha.startsWith(añoFiltro.toString()));
+        } else if(periodoSelector === 'rango' && fechaDesde && fechaHasta) {
+            datosFiltrados = datosFiltrados.filter(d => d.fecha >= fechaDesde && d.fecha <= fechaHasta);
+        }
+        
+        if(datosFiltrados.length === 0) {
+            if(analisisChart) analisisChart.destroy();
+            return;
+        }
+        
+        // Agrupar por período
+        const gruposReales = {};
+        const gruposMetas = {};
+        
+        datosFiltrados.forEach(item => {
+            const fecha = new Date(item.fecha);
+            let key;
+            if(agrupacion === 'dia') {
+                key = item.fecha;
+            } else if(agrupacion === 'mes') {
+                key = `${fecha.getFullYear()}-${String(fecha.getMonth()+1).padStart(2,'0')}`;
+            } else {
+                key = `${fecha.getFullYear()}`;
+            }
+            
+            if(!gruposReales[key]) {
+                gruposReales[key] = 0;
+                gruposMetas[key] = 0;
+            }
+            gruposReales[key] += item.valor;
+            // La meta la tomamos del último registro del período (promedio o máxima? usamos promedio para metas)
+            gruposMetas[key] = item.meta; // Simplificado: usamos la meta del último registro
+        });
+        
+        // Para metas, calcular promedio o usar la última
+        const periodos = Object.keys(gruposReales).sort();
+        const valoresReales = periodos.map(p => gruposReales[p]);
+        const valoresMetas = periodos.map(p => {
+            // Buscar la meta del último día de ese período
+            const itemsPeriodo = datosFiltrados.filter(d => {
+                const fecha = new Date(d.fecha);
+                let key;
+                if(agrupacion === 'dia') key = d.fecha;
+                else if(agrupacion === 'mes') key = `${fecha.getFullYear()}-${String(fecha.getMonth()+1).padStart(2,'0')}`;
+                else key = `${fecha.getFullYear()}`;
+                return key === p;
+            });
+            if(itemsPeriodo.length > 0) {
+                return itemsPeriodo[itemsPeriodo.length-1].meta;
+            }
+            return 0;
+        });
+        
+        if(analisisChart) analisisChart.destroy();
+        const ctx = document.getElementById('graficaAnalisis').getContext('2d');
+        
+        analisisChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: periodos,
+                datasets: [
+                    { label: `${titulo} (Real)`, data: valoresReales, backgroundColor: '#2563eb', borderRadius: 8 },
+                    { label: `${titulo} (Meta)`, data: valoresMetas, type: 'line', borderColor: '#f59e0b', borderWidth: 3, fill: false, tension: 0.1, pointRadius: 5, pointBackgroundColor: '#f59e0b' }
+                ]
+            },
+            options: {
+                responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
                     tooltip: { mode: 'index', intersect: false },
-                    legend: { position: 'top' }
+                    legend: { position: 'top' },
+                    title: { display: true, text: `${titulo} - Agrupado por ${agrupacion === 'dia' ? 'Día' : (agrupacion === 'mes' ? 'Mes' : 'Año')}`, font: { size: 16 } }
+                },
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: titulo } },
+                    x: { title: { display: true, text: agrupacion === 'dia' ? 'Fecha' : (agrupacion === 'mes' ? 'Mes' : 'Año') } }
                 }
             }
         });
+    };
+    
+    document.getElementById('periodoSelector').addEventListener('change', configurarSelectorPeriodo);
+    document.getElementById('añoFiltro').addEventListener('change', () => actualizarGraficaAnalisis());
+    document.getElementById('fechaDesde').addEventListener('change', () => actualizarGraficaAnalisis());
+    document.getElementById('fechaHasta').addEventListener('change', () => actualizarGraficaAnalisis());
+    document.getElementById('agrupacion').addEventListener('change', () => actualizarGraficaAnalisis());
+    
+    window.onload = () => {
+        document.getElementById('reg-fecha').value = new Date().toISOString().split('T')[0];
+        document.getElementById('añoFiltro').value = new Date().getFullYear();
     };
 </script>
 </body>
