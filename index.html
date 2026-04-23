@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KPI Dashboard Pro - v8.0 (Firebase)</title>
+    <title>KPI Dashboard Pro - v9.0 (Firebase)</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
@@ -11,7 +11,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         
         const firebaseConfig = {
             apiKey: "AIzaSyCQvF990R2rztUtyPUVb1csA0PU-j38X2g",
@@ -26,7 +26,6 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         
-        // Exponer Firebase al scope global
         window.db = db;
         window.collection = collection;
         window.getDocs = getDocs;
@@ -36,10 +35,7 @@
         window.doc = doc;
         window.query = query;
         window.orderBy = orderBy;
-        window.auth = auth;
-        window.signInAnonymously = signInAnonymously;
         
-        // Iniciar autenticación
         signInAnonymously(auth)
             .then(() => {
                 console.log("Autenticación exitosa");
@@ -48,7 +44,7 @@
             })
             .catch((error) => {
                 console.error("Error de autenticación:", error);
-                document.getElementById('sync-status').innerHTML = '❌ Error de conexión - Revisa reglas de Firebase';
+                document.getElementById('sync-status').innerHTML = '❌ Error de conexión';
             });
     </script>
     
@@ -81,6 +77,7 @@
         .btn-primary { background: var(--primary); color: white; width: 100%; max-width: 500px; }
         .btn-success { background: var(--success); color: white; }
         .btn-export { background: #475569; color: white; }
+        .btn-compare { background: var(--warning); color: white; }
 
         .table-container { overflow-x: auto; max-height: 500px; border: 1px solid #e2e8f0; border-radius: 8px; margin-top: 10px; }
         table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1000px; }
@@ -96,14 +93,13 @@
         .edit-btn { background: var(--primary); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
         .delete-btn { background: var(--danger); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
         
-        .metric-buttons { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-        .metric-btn { padding: 10px 20px; border: 2px solid var(--primary); background: white; color: var(--primary); border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
-        .metric-btn.active { background: var(--primary); color: white; }
-        
-        .filter-group { display: flex; gap: 15px; align-items: flex-end; margin-bottom: 20px; flex-wrap: wrap; }
-        .filter-item { display: flex; flex-direction: column; gap: 5px; }
-        .filter-item label { font-size: 12px; font-weight: bold; color: var(--secondary); }
-        .filter-item select, .filter-item input { width: 150px; }
+        .compare-days { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 20px; }
+        .day-selector { background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
+        .day-selector h4 { margin: 0 0 10px 0; color: var(--primary); }
+        .day-item { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .day-item input { flex: 1; }
+        .day-item button { background: var(--danger); color: white; border: none; border-radius: 4px; cursor: pointer; padding: 5px 10px; }
+        .add-day-btn { background: var(--success); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; margin-top: 10px; width: 100%; }
     </style>
 </head>
 <body>
@@ -193,28 +189,34 @@
         </div>
     </div>
 
-    <!-- Pestaña Comparativa de Periodos -->
+    <!-- Pestaña Comparativa de Periodos - NUEVA VERSIÓN -->
     <div id="comparativa" class="content">
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-            <div class="form-group"><label>Comparar por:</label>
-                <select id="tipo-comp">
-                    <option value="dia">Día Exacto</option>
-                    <option value="mes">Mes (Cierre)</option>
-                    <option value="año">Año (Cierre)</option>
+        <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h3 style="margin-top: 0;">Comparar días específicos (máximo 12)</h3>
+            <p style="color: var(--secondary); font-size: 14px;">Selecciona hasta 12 días para comparar (ej: 01/02/2026, 01/03/2026, etc.)</p>
+            
+            <div id="daysContainer" class="compare-days">
+                <div class="day-selector">
+                    <h4>Día 1</h4>
+                    <input type="date" id="day1" class="day-input">
+                </div>
+            </div>
+            
+            <button class="add-day-btn" id="addDayBtn">+ Agregar otro día</button>
+            
+            <div style="margin-top: 20px;">
+                <label>Métrica a comparar:</label>
+                <select id="metricaComparar" style="width: 200px;">
+                    <option value="inst">Instalaciones</option>
+                    <option value="crecimiento">Crecimiento</option>
+                    <option value="bajas">Bajas</option>
+                    <option value="perdidos">Clientes Perdidos</option>
                 </select>
             </div>
-            <div class="form-group"><label>Periodo A:</label>
-                <input type="date" id="fecha-a" class="in-dia">
-                <input type="month" id="mes-a" class="in-mes" style="display:none">
-                <input type="number" id="año-a" class="in-año" placeholder="2026" style="display:none">
-            </div>
-            <div class="form-group"><label>Periodo B:</label>
-                <input type="date" id="fecha-b" class="in-dia">
-                <input type="month" id="mes-b" class="in-mes" style="display:none">
-                <input type="number" id="año-b" class="in-año" placeholder="2025" style="display:none">
-            </div>
+            
+            <button class="btn btn-compare" id="btnCompararDias" style="margin-top: 20px; width: 100%;">📊 Comparar Días Seleccionados</button>
         </div>
-        <button class="btn btn-success" id="btnComparar" style="width:100%">📊 Comparar Cierres de Periodo</button>
+        
         <div class="chart-container">
             <canvas id="graficaComparativa"></canvas>
         </div>
@@ -233,28 +235,13 @@
             <div class="filter-item">
                 <label>Agrupar por:</label>
                 <select id="agrupacion">
-                    <option value="dia">Día</option>
-                    <option value="mes" selected>Mes</option>
-                    <option value="año">Año</option>
+                    <option value="mes" selected>Mes (último día)</option>
+                    <option value="año">Año (último día de cada mes)</option>
                 </select>
             </div>
             <div class="filter-item">
-                <label>Período específico:</label>
-                <select id="periodoSelector">
-                    <option value="todo">Todo el historial</option>
-                    <option value="año">Año específico</option>
-                    <option value="rango">Rango de fechas</option>
-                </select>
-            </div>
-            <div class="filter-item" id="añoSelector" style="display:none;">
                 <label>Año:</label>
-                <input type="number" id="añoFiltro">
-            </div>
-            <div class="filter-item" id="rangoSelector" style="display:none;">
-                <label>Desde:</label>
-                <input type="date" id="fechaDesde">
-                <label>Hasta:</label>
-                <input type="date" id="fechaHasta">
+                <input type="number" id="añoFiltroAnalisis" value="2026">
             </div>
         </div>
         
@@ -274,13 +261,48 @@
     let myChart = null;
     let analisisChart = null;
     let metricaActual = 'instalaciones';
+    let dayCount = 1;
     
-    // Elementos DOM
     const loadingDiv = document.getElementById('loading');
-    const syncStatus = document.getElementById('sync-status');
     
     function showLoading() { loadingDiv.style.display = 'block'; }
     function hideLoading() { loadingDiv.style.display = 'none'; }
+    
+    // Obtener el último día de cada mes con datos
+    function getUltimoDiaPorMes(data, año) {
+        const meses = {};
+        
+        data.forEach(item => {
+            if(item.fecha.startsWith(año.toString())) {
+                const mes = item.fecha.substring(0, 7); // YYYY-MM
+                if(!meses[mes] || item.fecha > meses[mes].fecha) {
+                    meses[mes] = item;
+                }
+            }
+        });
+        
+        return Object.values(meses).sort((a, b) => a.fecha.localeCompare(b.fecha));
+    }
+    
+    // Obtener el último día de cada mes por año (para años completos)
+    function getUltimoDiaPorAnio(data) {
+        const años = {};
+        
+        data.forEach(item => {
+            const año = item.fecha.substring(0, 4);
+            if(!años[año]) {
+                años[año] = [];
+            }
+            años[año].push(item);
+        });
+        
+        const resultado = {};
+        for(const año in años) {
+            resultado[año] = getUltimoDiaPorMes(años[año], año);
+        }
+        
+        return resultado;
+    }
     
     // AUTOCOMPLETADO DE METAS
     async function autoCompletarMetas() {
@@ -308,7 +330,6 @@
                 document.getElementById('m-crec').value = ultimoRegistro.obj_crecimiento || 0;
                 document.getElementById('m-bajas').value = ultimoRegistro.obj_bajas || 0;
                 document.getElementById('m-perd').value = ultimoRegistro.obj_perdidos || 0;
-                console.log("Metas autocompletadas desde:", fechaUltimo);
             }
         } catch (error) {
             console.error("Error en autocompletado:", error);
@@ -378,7 +399,6 @@
             
             await cargarDesdeFirebase();
             
-            // Limpiar reales, mantener metas
             document.getElementById('r-inst').value = '';
             document.getElementById('r-crec').value = '';
             document.getElementById('r-bajas').value = '';
@@ -441,7 +461,6 @@
             </tr>
         `).join('');
         
-        // Agregar event listeners a los botones
         document.querySelectorAll('.edit-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const registro = JSON.parse(btn.getAttribute('data-registro'));
@@ -515,50 +534,105 @@
         }
     }
     
-    // COMPARATIVA
-    function toggleInputsComparativa() {
-        const tipo = document.getElementById('tipo-comp').value;
-        document.querySelectorAll('#comparativa .in-dia').forEach(e => e.style.display = tipo === 'dia' ? 'block' : 'none');
-        document.querySelectorAll('#comparativa .in-mes').forEach(e => e.style.display = tipo === 'mes' ? 'block' : 'none');
-        document.querySelectorAll('#comparativa .in-año').forEach(e => e.style.display = tipo === 'año' ? 'block' : 'none');
-    }
-    
-    function ejecutarComparativa() {
-        const tipo = document.getElementById('tipo-comp').value;
-        const metrics = ['inst', 'crecimiento', 'bajas', 'perdidos'];
-        const labels = ['Instalaciones', 'Crecimiento', 'Bajas', 'C. Perdidos'];
+    // COMPARATIVA DE DÍAS ESPECÍFICOS (NUEVA VERSIÓN)
+    function agregarDiaSelector() {
+        if(dayCount >= 12) {
+            alert("Máximo 12 días para comparar");
+            return;
+        }
         
-        const getUltimoValor = (pref) => {
-            const val = document.getElementById(tipo === 'dia' ? 'fecha-'+pref : (tipo === 'mes' ? 'mes-'+pref : 'año-'+pref)).value;
-            if(!val) return { real: [0,0,0,0], meta: [0,0,0,0] };
-            const filtrados = dbData.filter(d => d.fecha.startsWith(val));
-            if(filtrados.length === 0) return { real: [0,0,0,0], meta: [0,0,0,0] };
-            filtrados.sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
-            const ultimo = filtrados[filtrados.length - 1];
-            return { real: metrics.map(m => ultimo[m]), meta: metrics.map(m => ultimo['obj_'+m]) };
-        };
+        dayCount++;
+        const container = document.getElementById('daysContainer');
+        const newDay = document.createElement('div');
+        newDay.className = 'day-selector';
+        newDay.innerHTML = `
+            <h4>Día ${dayCount}</h4>
+            <div class="day-item">
+                <input type="date" class="day-input" id="day${dayCount}">
+                <button class="remove-day" data-day="${dayCount}">✖️</button>
+            </div>
+        `;
+        container.appendChild(newDay);
         
-        const dataA = getUltimoValor('a');
-        const dataB = getUltimoValor('b');
-        
-        if(myChart) myChart.destroy();
-        const ctx = document.getElementById('graficaComparativa').getContext('2d');
-        myChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    { label: 'Periodo A (Cierre)', data: dataA.real, backgroundColor: '#2563eb' },
-                    { label: 'Meta A', data: dataA.meta, type: 'line', borderColor: '#93c5fd', borderDash: [5, 5], borderWidth: 2, fill: false },
-                    { label: 'Periodo B (Cierre)', data: dataB.real, backgroundColor: '#22c55e' },
-                    { label: 'Meta B', data: dataB.meta, type: 'line', borderColor: '#86efac', borderDash: [5, 5], borderWidth: 2, fill: false }
-                ]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
+        newDay.querySelector('.remove-day').addEventListener('click', () => {
+            newDay.remove();
+            dayCount--;
+            // Renumerar los títulos
+            const selectors = document.querySelectorAll('.day-selector');
+            selectors.forEach((selector, idx) => {
+                selector.querySelector('h4').textContent = `Día ${idx + 1}`;
+            });
         });
     }
     
-    // ANÁLISIS POR MÉTRICA
+    function compararDias() {
+        const days = [];
+        for(let i = 1; i <= dayCount; i++) {
+            const dayInput = document.getElementById(`day${i}`);
+            if(dayInput && dayInput.value) {
+                days.push(dayInput.value);
+            }
+        }
+        
+        if(days.length === 0) {
+            alert("Selecciona al menos un día para comparar");
+            return;
+        }
+        
+        const metrica = document.getElementById('metricaComparar').value;
+        const labelsMap = {
+            'inst': 'Instalaciones',
+            'crecimiento': 'Crecimiento',
+            'bajas': 'Bajas',
+            'perdidos': 'Clientes Perdidos'
+        };
+        
+        // Buscar los datos para cada día seleccionado
+        const valores = [];
+        const fechasValidas = [];
+        
+        days.forEach(day => {
+            const registro = dbData.find(d => d.fecha === day);
+            if(registro) {
+                valores.push(registro[metrica]);
+                fechasValidas.push(day);
+            } else {
+                valores.push(0);
+                fechasValidas.push(day);
+            }
+        });
+        
+        if(myChart) myChart.destroy();
+        const ctx = document.getElementById('graficaComparativa').getContext('2d');
+        
+        myChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: fechasValidas,
+                datasets: [{
+                    label: labelsMap[metrica],
+                    data: valores,
+                    backgroundColor: '#2563eb',
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    tooltip: { mode: 'index', intersect: false },
+                    legend: { position: 'top' },
+                    title: { display: true, text: `Comparativa de ${labelsMap[metrica]}`, font: { size: 16 } }
+                },
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: labelsMap[metrica] } },
+                    x: { title: { display: true, text: 'Fecha' } }
+                }
+            }
+        });
+    }
+    
+    // ANÁLISIS POR MÉTRICA (CORREGIDO - SOLO ÚLTIMO DÍA DE CADA MES)
     function cambiarMetrica(metrica) {
         metricaActual = metrica;
         document.querySelectorAll('.metric-btn').forEach(btn => btn.classList.remove('active'));
@@ -566,32 +640,11 @@
         actualizarGraficaAnalisis();
     }
     
-    function configurarSelectorPeriodo() {
-        const selector = document.getElementById('periodoSelector');
-        const añoDiv = document.getElementById('añoSelector');
-        const rangoDiv = document.getElementById('rangoSelector');
-        
-        if(selector.value === 'año') {
-            añoDiv.style.display = 'flex';
-            rangoDiv.style.display = 'none';
-        } else if(selector.value === 'rango') {
-            añoDiv.style.display = 'none';
-            rangoDiv.style.display = 'flex';
-        } else {
-            añoDiv.style.display = 'none';
-            rangoDiv.style.display = 'none';
-        }
-        actualizarGraficaAnalisis();
-    }
-    
     function actualizarGraficaAnalisis() {
         if(dbData.length === 0) return;
         
         const agrupacion = document.getElementById('agrupacion').value;
-        const periodoSelector = document.getElementById('periodoSelector').value;
-        const añoFiltro = parseInt(document.getElementById('añoFiltro').value);
-        const fechaDesde = document.getElementById('fechaDesde').value;
-        const fechaHasta = document.getElementById('fechaHasta').value;
+        const añoFiltro = parseInt(document.getElementById('añoFiltroAnalisis').value);
         
         let campoReal, campoMeta, titulo;
         switch(metricaActual) {
@@ -621,88 +674,98 @@
                 titulo = 'Instalaciones';
         }
         
-        let datosFiltrados = dbData.map(d => ({
-            fecha: d.fecha,
-            valor: d[campoReal],
-            meta: d[campoMeta]
-        }));
-        
-        if(periodoSelector === 'año' && añoFiltro) {
-            datosFiltrados = datosFiltrados.filter(d => d.fecha.startsWith(añoFiltro.toString()));
-        } else if(periodoSelector === 'rango' && fechaDesde && fechaHasta) {
-            datosFiltrados = datosFiltrados.filter(d => d.fecha >= fechaDesde && d.fecha <= fechaHasta);
-        }
-        
-        if(datosFiltrados.length === 0) {
-            if(analisisChart) analisisChart.destroy();
-            return;
-        }
-        
-        const gruposReales = {};
-        const gruposMetas = {};
-        
-        datosFiltrados.forEach(item => {
-            const fecha = new Date(item.fecha);
-            let key;
-            if(agrupacion === 'dia') {
-                key = item.fecha;
-            } else if(agrupacion === 'mes') {
-                key = `${fecha.getFullYear()}-${String(fecha.getMonth()+1).padStart(2,'0')}`;
-            } else {
-                key = `${fecha.getFullYear()}`;
+        if(agrupacion === 'mes') {
+            // Obtener último día de cada mes del año seleccionado
+            const ultimosDias = getUltimoDiaPorMes(dbData, añoFiltro);
+            
+            if(ultimosDias.length === 0) {
+                if(analisisChart) analisisChart.destroy();
+                return;
             }
             
-            if(!gruposReales[key]) {
-                gruposReales[key] = 0;
-                gruposMetas[key] = 0;
-            }
-            gruposReales[key] += item.valor;
-            gruposMetas[key] = item.meta;
-        });
-        
-        const periodos = Object.keys(gruposReales).sort();
-        const valoresReales = periodos.map(p => gruposReales[p]);
-        const valoresMetas = periodos.map(p => {
-            const itemsPeriodo = datosFiltrados.filter(d => {
+            const labels = ultimosDias.map(d => {
                 const fecha = new Date(d.fecha);
-                let key;
-                if(agrupacion === 'dia') key = d.fecha;
-                else if(agrupacion === 'mes') key = `${fecha.getFullYear()}-${String(fecha.getMonth()+1).padStart(2,'0')}`;
-                else key = `${fecha.getFullYear()}`;
-                return key === p;
+                return fecha.toLocaleDateString('es-ES', { month: 'long', day: 'numeric' });
             });
-            if(itemsPeriodo.length > 0) {
-                return itemsPeriodo[itemsPeriodo.length-1].meta;
-            }
-            return 0;
-        });
-        
-        if(analisisChart) analisisChart.destroy();
-        const ctx = document.getElementById('graficaAnalisis').getContext('2d');
-        
-        analisisChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: periodos,
-                datasets: [
-                    { label: `${titulo} (Real)`, data: valoresReales, backgroundColor: '#2563eb', borderRadius: 8 },
-                    { label: `${titulo} (Meta)`, data: valoresMetas, type: 'line', borderColor: '#f59e0b', borderWidth: 3, fill: false, tension: 0.1, pointRadius: 5, pointBackgroundColor: '#f59e0b' }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    tooltip: { mode: 'index', intersect: false },
-                    legend: { position: 'top' },
-                    title: { display: true, text: `${titulo} - Agrupado por ${agrupacion === 'dia' ? 'Día' : (agrupacion === 'mes' ? 'Mes' : 'Año')}`, font: { size: 16 } }
+            const valoresReales = ultimosDias.map(d => d[campoReal]);
+            const valoresMetas = ultimosDias.map(d => d[campoMeta]);
+            
+            if(analisisChart) analisisChart.destroy();
+            const ctx = document.getElementById('graficaAnalisis').getContext('2d');
+            
+            analisisChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: `${titulo} (Real)`, data: valoresReales, backgroundColor: '#2563eb', borderRadius: 8 },
+                        { label: `${titulo} (Meta)`, data: valoresMetas, type: 'line', borderColor: '#f59e0b', borderWidth: 3, fill: false, tension: 0.1, pointRadius: 5, pointBackgroundColor: '#f59e0b' }
+                    ]
                 },
-                scales: {
-                    y: { beginAtZero: true, title: { display: true, text: titulo } },
-                    x: { title: { display: true, text: agrupacion === 'dia' ? 'Fecha' : (agrupacion === 'mes' ? 'Mes' : 'Año') } }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: { mode: 'index', intersect: false },
+                        legend: { position: 'top' },
+                        title: { display: true, text: `${titulo} - ${añoFiltro} (Último día de cada mes)`, font: { size: 16 } }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: titulo } },
+                        x: { title: { display: true, text: 'Mes' } }
+                    }
                 }
-            }
-        });
+            });
+        } else {
+            // Agrupación por año - mostrar todos los años disponibles
+            const añosDisponibles = {};
+            dbData.forEach(item => {
+                const año = item.fecha.substring(0, 4);
+                if(!añosDisponibles[año]) {
+                    añosDisponibles[año] = [];
+                }
+                añosDisponibles[año].push(item);
+            });
+            
+            const años = Object.keys(añosDisponibles).sort();
+            const valoresReales = [];
+            const valoresMetas = [];
+            
+            años.forEach(año => {
+                const ultimosDias = getUltimoDiaPorMes(dbData, año);
+                const sumaReal = ultimosDias.reduce((sum, d) => sum + d[campoReal], 0);
+                const sumaMeta = ultimosDias.reduce((sum, d) => sum + d[campoMeta], 0);
+                valoresReales.push(sumaReal);
+                valoresMetas.push(sumaMeta);
+            });
+            
+            if(analisisChart) analisisChart.destroy();
+            const ctx = document.getElementById('graficaAnalisis').getContext('2d');
+            
+            analisisChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: años,
+                    datasets: [
+                        { label: `${titulo} (Real)`, data: valoresReales, backgroundColor: '#2563eb', borderRadius: 8 },
+                        { label: `${titulo} (Meta)`, data: valoresMetas, type: 'line', borderColor: '#f59e0b', borderWidth: 3, fill: false, tension: 0.1, pointRadius: 5, pointBackgroundColor: '#f59e0b' }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: { mode: 'index', intersect: false },
+                        legend: { position: 'top' },
+                        title: { display: true, text: `${titulo} - Sumatoria anual (último día de cada mes)`, font: { size: 16 } }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: titulo } },
+                        x: { title: { display: true, text: 'Año' } }
+                    }
+                }
+            });
+        }
     }
     
     // EVENT LISTENERS
@@ -710,15 +773,12 @@
     document.getElementById('btnGuardar').addEventListener('click', guardarEnFirebase);
     document.getElementById('btnCargar').addEventListener('click', cargarDesdeFirebase);
     document.getElementById('btnExportar').addEventListener('click', exportarExcel);
-    document.getElementById('btnComparar').addEventListener('click', ejecutarComparativa);
-    document.getElementById('tipo-comp').addEventListener('change', toggleInputsComparativa);
+    document.getElementById('btnCompararDias').addEventListener('click', compararDias);
+    document.getElementById('addDayBtn').addEventListener('click', agregarDiaSelector);
     document.getElementById('agrupacion').addEventListener('change', actualizarGraficaAnalisis);
-    document.getElementById('periodoSelector').addEventListener('change', configurarSelectorPeriodo);
-    document.getElementById('añoFiltro').addEventListener('change', actualizarGraficaAnalisis);
-    document.getElementById('fechaDesde').addEventListener('change', actualizarGraficaAnalisis);
-    document.getElementById('fechaHasta').addEventListener('change', actualizarGraficaAnalisis);
+    document.getElementById('añoFiltroAnalisis').addEventListener('change', actualizarGraficaAnalisis);
+    document.getElementById('metricaComparar').addEventListener('change', () => {});
     
-    // Event listeners para pestañas
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const tabId = btn.getAttribute('data-tab');
@@ -726,7 +786,6 @@
         });
     });
     
-    // Event listeners para botones de métrica
     document.querySelectorAll('.metric-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const metrica = btn.getAttribute('data-metrica');
@@ -736,10 +795,8 @@
     
     // Inicialización
     document.getElementById('reg-fecha').value = new Date().toISOString().split('T')[0];
-    document.getElementById('añoFiltro').value = new Date().getFullYear();
-    configurarSelectorPeriodo();
+    document.getElementById('añoFiltroAnalisis').value = new Date().getFullYear();
     
-    // Cargar datos después de autenticación
     const checkAuth = setInterval(() => {
         if(window.db) {
             clearInterval(checkAuth);
