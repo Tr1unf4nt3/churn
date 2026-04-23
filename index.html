@@ -103,16 +103,16 @@
             <div class="sync-status" id="sync-status">🔄 Conectando a Firebase...</div>
         </div>
         <div style="display: flex; gap: 10px;">
-            <button class="btn btn-export" onclick="exportarExcel()">📥 Exportar Respaldo</button>
-            <button class="btn btn-export" onclick="sincronizarFromLocal()">☁️ Sincronizar desde Local</button>
+            <button class="btn btn-export" onclick="window.exportarExcel()">📥 Exportar Respaldo</button>
+            <button class="btn btn-export" onclick="window.sincronizarFromLocal()">☁️ Sincronizar desde Local</button>
         </div>
     </div>
     
     <div class="tabs">
-        <button class="tab-btn active" onclick="openTab('registro')">📝 Registro Diario</button>
-        <button class="tab-btn" onclick="openTab('importar')">🗄️ Base de Datos</button>
-        <button class="tab-btn" onclick="openTab('comparativa')">📊 Comparativa de Periodos</button>
-        <button class="tab-btn" onclick="openTab('analisis')">📈 Análisis por Métrica</button>
+        <button class="tab-btn active" data-tab="registro">📝 Registro Diario</button>
+        <button class="tab-btn" data-tab="importar">🗄️ Base de Datos</button>
+        <button class="tab-btn" data-tab="comparativa">📊 Comparativa de Periodos</button>
+        <button class="tab-btn" data-tab="analisis">📈 Análisis por Métrica</button>
     </div>
 
     <!-- Pestaña Registro -->
@@ -120,7 +120,7 @@
         <div class="registro-vertical">
             <div class="form-section">
                 <label class="section-title">📅 Fecha de Registro</label>
-                <input type="date" id="reg-fecha" onchange="autoCompletarMetas()">
+                <input type="date" id="reg-fecha" onchange="window.autoCompletarMetas()">
                 <small style="color: var(--secondary);">✨ Al seleccionar fecha, se autocompletan las metas del último registro</small>
             </div>
 
@@ -156,7 +156,7 @@
                 </div>
             </div>
         </div>
-        <button class="btn btn-primary" onclick="guardarEnFirebase()">💾 Guardar en Firebase</button>
+        <button class="btn btn-primary" onclick="window.guardarEnFirebase()">💾 Guardar en Firebase</button>
     </div>
 
     <!-- Pestaña Base de Datos -->
@@ -164,7 +164,7 @@
         <div style="background: #f1f5f9; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
             <input type="file" id="excel-file" accept=".xlsx, .xls">
             <strong id="contador-filas">0 Registros</strong>
-            <button class="btn btn-success" onclick="cargarDesdeFirebase()" style="width: auto;">🔄 Cargar desde Firebase</button>
+            <button class="btn btn-success" onclick="window.cargarDesdeFirebase()" style="width: auto;">🔄 Cargar desde Firebase</button>
         </div>
         <div class="table-container">
             <table>
@@ -183,11 +183,11 @@
         </div>
     </div>
 
-    <!-- Pestaña Comparativa de Periodos (original) -->
+    <!-- Pestaña Comparativa de Periodos -->
     <div id="comparativa" class="content">
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
             <div class="form-group"><label>Comparar por:</label>
-                <select id="tipo-comp" onchange="toggleInputsComparativa()">
+                <select id="tipo-comp" onchange="window.toggleInputsComparativa()">
                     <option value="dia">Día Exacto</option>
                     <option value="mes">Mes (Cierre)</option>
                     <option value="año">Año (Cierre)</option>
@@ -204,25 +204,25 @@
                 <input type="number" id="año-b" class="in-año" placeholder="2025" style="display:none">
             </div>
         </div>
-        <button class="btn btn-success" style="width:100%" onclick="ejecutarComparativa()">📊 Comparar Cierres de Periodo</button>
+        <button class="btn btn-success" style="width:100%" onclick="window.ejecutarComparativa()">📊 Comparar Cierres de Periodo</button>
         <div class="chart-container">
             <canvas id="graficaComparativa"></canvas>
         </div>
     </div>
 
-    <!-- Pestaña Análisis por Métrica (NUEVA) -->
+    <!-- Pestaña Análisis por Métrica -->
     <div id="analisis" class="content">
         <div class="metric-buttons">
-            <button class="metric-btn active" onclick="cambiarMetrica('instalaciones')">🏗️ Instalaciones</button>
-            <button class="metric-btn" onclick="cambiarMetrica('crecimiento')">📈 Crecimiento</button>
-            <button class="metric-btn" onclick="cambiarMetrica('bajas')">⚠️ Bajas</button>
-            <button class="metric-btn" onclick="cambiarMetrica('perdidos')">📉 Clientes Perdidos</button>
+            <button class="metric-btn active" data-metrica="instalaciones">🏗️ Instalaciones</button>
+            <button class="metric-btn" data-metrica="crecimiento">📈 Crecimiento</button>
+            <button class="metric-btn" data-metrica="bajas">⚠️ Bajas</button>
+            <button class="metric-btn" data-metrica="perdidos">📉 Clientes Perdidos</button>
         </div>
         
         <div class="filter-group">
             <div class="filter-item">
                 <label>Agrupar por:</label>
-                <select id="agrupacion" onchange="actualizarGraficaAnalisis()">
+                <select id="agrupacion" onchange="window.actualizarGraficaAnalisis()">
                     <option value="dia">Día</option>
                     <option value="mes" selected>Mes</option>
                     <option value="año">Año</option>
@@ -230,7 +230,7 @@
             </div>
             <div class="filter-item">
                 <label>Período específico:</label>
-                <select id="periodoSelector" onchange="actualizarGraficaAnalisis()">
+                <select id="periodoSelector" onchange="window.configurarSelectorPeriodo()">
                     <option value="todo">Todo el historial</option>
                     <option value="año">Año específico</option>
                     <option value="rango">Rango de fechas</option>
@@ -238,13 +238,13 @@
             </div>
             <div class="filter-item" id="añoSelector" style="display:none;">
                 <label>Año:</label>
-                <input type="number" id="añoFiltro" placeholder="2026" onchange="actualizarGraficaAnalisis()">
+                <input type="number" id="añoFiltro" onchange="window.actualizarGraficaAnalisis()">
             </div>
             <div class="filter-item" id="rangoSelector" style="display:none;">
                 <label>Desde:</label>
-                <input type="date" id="fechaDesde" onchange="actualizarGraficaAnalisis()">
+                <input type="date" id="fechaDesde" onchange="window.actualizarGraficaAnalisis()">
                 <label>Hasta:</label>
-                <input type="date" id="fechaHasta" onchange="actualizarGraficaAnalisis()">
+                <input type="date" id="fechaHasta" onchange="window.actualizarGraficaAnalisis()">
             </div>
         </div>
         
@@ -265,17 +265,15 @@
     let analisisChart = null;
     let metricaActual = 'instalaciones';
     
-    // Autenticación
+    // Funciones de UI
     function showLoading() { document.getElementById('loading').style.display = 'block'; }
     function hideLoading() { document.getElementById('loading').style.display = 'none'; }
     
-    const auth = window.auth;
-    const db = window.db;
-    
+    // Autenticación
     signInAnonymously(auth)
         .then(() => {
             document.getElementById('sync-status').innerHTML = '✅ Conectado a Firebase';
-            cargarDesdeFirebase();
+            window.cargarDesdeFirebase();
         })
         .catch((error) => {
             console.error("Error de autenticación:", error);
@@ -289,7 +287,6 @@
         if(!fechaSeleccionada) return;
         
         try {
-            // Buscar el registro más reciente anterior a la fecha seleccionada
             const q = query(collection(db, "kpi_dashboard"), orderBy("fecha", "desc"));
             const querySnapshot = await getDocs(q);
             let ultimoRegistro = null;
@@ -311,8 +308,6 @@
                 document.getElementById('m-bajas').value = ultimoRegistro.obj_bajas || 0;
                 document.getElementById('m-perd').value = ultimoRegistro.obj_perdidos || 0;
                 console.log("Metas autocompletadas desde:", fechaUltimo);
-            } else {
-                console.log("No se encontró registro previo para autocompletar");
             }
         } catch (error) {
             console.error("Error en autocompletado:", error);
@@ -331,9 +326,8 @@
             });
             renderTable();
             hideLoading();
-            // Si estamos en la pestaña de análisis, actualizar gráfica
             if(document.getElementById('analisis').classList.contains('active')) {
-                actualizarGraficaAnalisis();
+                window.actualizarGraficaAnalisis();
             }
             return dbData;
         } catch (error) {
@@ -424,10 +418,7 @@
         document.getElementById('r-perd').value = registro.perdidos;
         document.getElementById('m-perd').value = registro.obj_perdidos;
         
-        openTab('registro');
-        const btns = document.querySelectorAll('.tab-btn');
-        btns.forEach(btn => btn.classList.remove('active'));
-        btns[0].classList.add('active');
+        window.openTab('registro');
     };
     
     function renderTable() {
@@ -440,8 +431,8 @@
                 <td>${d.bajas} <span class="goal-tag">M: ${d.obj_bajas}</span></td>
                 <td>${d.perdidos} <span class="goal-tag">M: ${d.obj_perdidos}</span></td>
                 <td class="action-buttons">
-                    <button class="edit-btn" onclick='editarRegistro(${JSON.stringify(d)})'>✏️ Editar</button>
-                    <button class="delete-btn" onclick="eliminarRegistro('${d.id}')">🗑️ Eliminar</button>
+                    <button class="edit-btn" onclick='window.editarRegistro(${JSON.stringify(d)})'>✏️ Editar</button>
+                    <button class="delete-btn" onclick="window.eliminarRegistro('${d.id}')">🗑️ Eliminar</button>
                 </td>
             </tr>
         `).join('');
@@ -514,14 +505,34 @@
         XLSX.writeFile(wb, `KPI_Backup_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
     
-    window.openTab = function(id) {
+    // MANEJO DE PESTAÑAS - CORREGIDO
+    window.openTab = function(tabId) {
+        // Ocultar todos los contenidos
         document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById(id).classList.add('active');
-        if(event && event.currentTarget) event.currentTarget.classList.add('active');
+        // Mostrar el contenido seleccionado
+        document.getElementById(tabId).classList.add('active');
         
-        if(id === 'analisis') actualizarGraficaAnalisis();
+        // Actualizar botones
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if(btn.getAttribute('data-tab') === tabId) {
+                btn.classList.add('active');
+            }
+        });
+        
+        // Si es la pestaña de análisis, actualizar gráfica
+        if(tabId === 'analisis') {
+            window.actualizarGraficaAnalisis();
+        }
     };
+    
+    // Configurar eventos de las pestañas
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tabId = this.getAttribute('data-tab');
+            window.openTab(tabId);
+        });
+    });
     
     window.toggleInputsComparativa = function() {
         const tipo = document.getElementById('tipo-comp').value;
@@ -565,15 +576,15 @@
         });
     };
     
-    // NUEVA FUNCIONALIDAD: Gráficas por métrica
+    // FUNCIONES PARA ANÁLISIS POR MÉTRICA
     window.cambiarMetrica = function(metrica) {
         metricaActual = metrica;
         document.querySelectorAll('.metric-btn').forEach(btn => btn.classList.remove('active'));
-        event.currentTarget.classList.add('active');
-        actualizarGraficaAnalisis();
+        document.querySelector(`.metric-btn[data-metrica="${metrica}"]`).classList.add('active');
+        window.actualizarGraficaAnalisis();
     };
     
-    function configurarSelectorPeriodo() {
+    window.configurarSelectorPeriodo = function() {
         const selector = document.getElementById('periodoSelector');
         const añoDiv = document.getElementById('añoSelector');
         const rangoDiv = document.getElementById('rangoSelector');
@@ -588,39 +599,8 @@
             añoDiv.style.display = 'none';
             rangoDiv.style.display = 'none';
         }
-    }
-    
-    function agruparPorPeriodo(data, agrupacion) {
-        const grupos = {};
-        
-        data.forEach(item => {
-            const fecha = new Date(item.fecha);
-            let key;
-            if(agrupacion === 'dia') {
-                key = item.fecha;
-            } else if(agrupacion === 'mes') {
-                key = `${fecha.getFullYear()}-${String(fecha.getMonth()+1).padStart(2,'0')}`;
-            } else {
-                key = `${fecha.getFullYear()}`;
-            }
-            
-            if(!grupos[key]) {
-                grupos[key] = { suma: 0, count: 0, fechas: [] };
-            }
-            grupos[key].suma += item.valor;
-            grupos[key].count++;
-            grupos[key].fechas.push(item.fecha);
-        });
-        
-        // Convertir a array ordenado
-        const resultado = Object.keys(grupos).sort().map(key => ({
-            periodo: key,
-            valor: agrupacion === 'dia' ? grupos[key].suma : 
-                   (agrupacion === 'mes' ? grupos[key].suma : grupos[key].suma)
-        }));
-        
-        return resultado;
-    }
+        window.actualizarGraficaAnalisis();
+    };
     
     window.actualizarGraficaAnalisis = function() {
         if(dbData.length === 0) return;
@@ -630,8 +610,6 @@
         const añoFiltro = parseInt(document.getElementById('añoFiltro').value);
         const fechaDesde = document.getElementById('fechaDesde').value;
         const fechaHasta = document.getElementById('fechaHasta').value;
-        
-        configurarSelectorPeriodo();
         
         // Mapear métrica a campo
         let campoReal, campoMeta, titulo;
@@ -656,6 +634,10 @@
                 campoMeta = 'obj_perdidos';
                 titulo = 'Clientes Perdidos';
                 break;
+            default:
+                campoReal = 'inst';
+                campoMeta = 'obj_inst';
+                titulo = 'Instalaciones';
         }
         
         // Filtrar datos
@@ -697,15 +679,12 @@
                 gruposMetas[key] = 0;
             }
             gruposReales[key] += item.valor;
-            // La meta la tomamos del último registro del período (promedio o máxima? usamos promedio para metas)
-            gruposMetas[key] = item.meta; // Simplificado: usamos la meta del último registro
+            gruposMetas[key] = item.meta;
         });
         
-        // Para metas, calcular promedio o usar la última
         const periodos = Object.keys(gruposReales).sort();
         const valoresReales = periodos.map(p => gruposReales[p]);
         const valoresMetas = periodos.map(p => {
-            // Buscar la meta del último día de ese período
             const itemsPeriodo = datosFiltrados.filter(d => {
                 const fecha = new Date(d.fecha);
                 let key;
@@ -748,15 +727,19 @@
         });
     };
     
-    document.getElementById('periodoSelector').addEventListener('change', configurarSelectorPeriodo);
-    document.getElementById('añoFiltro').addEventListener('change', () => actualizarGraficaAnalisis());
-    document.getElementById('fechaDesde').addEventListener('change', () => actualizarGraficaAnalisis());
-    document.getElementById('fechaHasta').addEventListener('change', () => actualizarGraficaAnalisis());
-    document.getElementById('agrupacion').addEventListener('change', () => actualizarGraficaAnalisis());
+    // Configurar eventos de los botones de métrica
+    document.querySelectorAll('.metric-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const metrica = this.getAttribute('data-metrica');
+            window.cambiarMetrica(metrica);
+        });
+    });
     
+    // Inicialización
     window.onload = () => {
         document.getElementById('reg-fecha').value = new Date().toISOString().split('T')[0];
         document.getElementById('añoFiltro').value = new Date().getFullYear();
+        window.configurarSelectorPeriodo();
     };
 </script>
 </body>
