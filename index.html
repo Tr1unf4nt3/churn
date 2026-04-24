@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KPI Dashboard Pro - v13.0 (Multi-Día)</title>
+    <title>KPI Dashboard Pro - v14.0 (Metas Mensuales)</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
@@ -42,6 +42,7 @@
                 console.log("Autenticación exitosa");
                 document.getElementById('sync-status').innerHTML = '✅ Conectado a Firebase';
                 if(window.cargarDesdeFirebase) window.cargarDesdeFirebase();
+                if(window.cargarMetasMensuales) window.cargarMetasMensuales();
             })
             .catch((error) => {
                 console.error("Error de autenticación:", error);
@@ -110,6 +111,14 @@
         .centro-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f8fafc; margin-bottom: 10px; border-radius: 6px; }
         .centro-item button { padding: 5px 10px; font-size: 12px; }
         
+        .metas-container { background: #f8fafc; padding: 20px; border-radius: 12px; }
+        .meta-filters { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+        .meta-table { overflow-x: auto; }
+        .meta-table table { width: 100%; border-collapse: collapse; }
+        .meta-table th, .meta-table td { padding: 10px; text-align: center; border: 1px solid #e2e8f0; }
+        .meta-table th { background: var(--dark); color: white; }
+        .meta-table input { width: 100px; text-align: center; }
+        
         .multi-day-container { background: #f8fafc; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
         .days-list { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
         .day-item { display: flex; align-items: center; gap: 10px; background: white; padding: 8px 12px; border-radius: 8px; border: 1px solid #e2e8f0; }
@@ -121,6 +130,8 @@
         .un-filter-item { display: flex; flex-direction: column; gap: 8px; }
         .un-filter-item label { font-weight: bold; color: var(--un-color); }
         .un-filter-item select, .un-filter-item input { width: 200px; }
+        
+        .info-badge { background: var(--primary); color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px; }
     </style>
 </head>
 <body>
@@ -129,7 +140,7 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
         <div>
             <h1 style="margin:0; color: var(--primary);">KPI Dashboard Pro</h1>
-            <p style="margin:0; color: var(--secondary);">Multi-Centro de Operaciones | UN Caracas</p>
+            <p style="margin:0; color: var(--secondary);">Multi-Centro de Operaciones | Metas Mensuales</p>
             <div class="sync-status" id="sync-status">🔄 Conectando a Firebase...</div>
         </div>
         <button class="btn btn-export" id="btnExportar">📥 Exportar Excel</button>
@@ -137,6 +148,7 @@
     
     <div class="tabs" id="tabs">
         <button class="tab-btn active" data-tab="registro">📝 Registro Diario</button>
+        <button class="tab-btn" data-tab="metas">🎯 Metas Mensuales</button>
         <button class="tab-btn" data-tab="centros">🏢 Centros de Operación</button>
         <button class="tab-btn" data-tab="importar">🗄️ Base de Datos</button>
         <button class="tab-btn" data-tab="comparativa">📊 Comparativa Centro</button>
@@ -157,37 +169,82 @@
             <div class="form-section">
                 <label class="section-title">📅 Fecha de Registro</label>
                 <input type="date" id="reg-fecha">
+                <small style="color: var(--secondary);">✨ La meta se cargará automáticamente según el mes seleccionado</small>
             </div>
             <div class="form-section">
                 <label class="section-title">🏗️ Instalaciones</label>
                 <div class="input-group">
                     <div class="input-row"><label>Real:</label><input type="number" id="r-inst" placeholder="0"></div>
-                    <div class="input-row"><label>Meta:</label><input type="number" id="m-inst" placeholder="0"></div>
+                    <div class="input-row"><label>Meta:</label><input type="number" id="m-inst" placeholder="0" readonly style="background: #f1f5f9;"></div>
                 </div>
             </div>
             <div class="form-section">
                 <label class="section-title">📈 Crecimiento</label>
                 <div class="input-group">
                     <div class="input-row"><label>Real:</label><input type="number" id="r-crec" placeholder="0"></div>
-                    <div class="input-row"><label>Meta:</label><input type="number" id="m-crec" placeholder="0"></div>
+                    <div class="input-row"><label>Meta:</label><input type="number" id="m-crec" placeholder="0" readonly style="background: #f1f5f9;"></div>
                 </div>
             </div>
             <div class="form-section">
                 <label class="section-title">⚠️ Bajas Rezagadas Canceladas</label>
                 <div class="input-group">
                     <div class="input-row"><label>Real:</label><input type="number" id="r-bajas" placeholder="0"></div>
-                    <div class="input-row"><label>Meta:</label><input type="number" id="m-bajas" placeholder="0"></div>
+                    <div class="input-row"><label>Meta:</label><input type="number" id="m-bajas" placeholder="0" readonly style="background: #f1f5f9;"></div>
                 </div>
             </div>
             <div class="form-section">
                 <label class="section-title">📉 Clientes Perdidos</label>
                 <div class="input-group">
                     <div class="input-row"><label>Real:</label><input type="number" id="r-perd" placeholder="0"></div>
-                    <div class="input-row"><label>Meta:</label><input type="number" id="m-perd" placeholder="0"></div>
+                    <div class="input-row"><label>Meta:</label><input type="number" id="m-perd" placeholder="0" readonly style="background: #f1f5f9;"></div>
                 </div>
             </div>
         </div>
         <button class="btn btn-primary" id="btnGuardar">💾 Guardar en Firebase</button>
+    </div>
+
+    <!-- Pestaña Metas Mensuales (NUEVA) -->
+    <div id="metas" class="content">
+        <div class="metas-container">
+            <h3 style="margin-top: 0;">🎯 Metas Mensuales por Centro</h3>
+            <p style="color: var(--secondary); margin-bottom: 20px;">Define la meta para cada centro por mes. La meta de UN Caracas se calcula automáticamente como la suma de todos los centros.</p>
+            
+            <div class="meta-filters">
+                <div class="filter-item">
+                    <label>Seleccionar Centro:</label>
+                    <select id="metaCentroSelect">
+                        <option value="">Seleccionar Centro...</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label>Año:</label>
+                    <input type="number" id="metaAño" value="2026">
+                </div>
+                <button class="btn btn-success" id="btnCargarMetas" style="width: auto;">Cargar Metas</button>
+            </div>
+            
+            <div class="meta-table" id="metaTableContainer">
+                <table id="metaTable">
+                    <thead>
+                        <tr>
+                            <th>Mes</th>
+                            <th>Instalaciones <span class="info-badge">Meta</span></th>
+                            <th>Crecimiento <span class="info-badge">Meta</span></th>
+                            <th>Bajas <span class="info-badge">Meta</span></th>
+                            <th>Clientes Perdidos <span class="info-badge">Meta</span></th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="metaTableBody">
+                        <tr><td colspan="6" style="text-align: center;">Selecciona un centro y año para cargar las metas</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <button class="btn btn-primary" id="btnGuardarMetas" style="width: auto; padding: 10px 30px;">💾 Guardar Metas del Centro</button>
+            </div>
+        </div>
     </div>
 
     <!-- Pestaña Centros de Operación -->
@@ -359,7 +416,7 @@
         </div>
     </div>
 
-    <!-- Pestaña Comparativa Multi-Día (NUEVA) -->
+    <!-- Pestaña Comparativa Multi-Día -->
     <div id="multiComparativa" class="content">
         <div class="multi-day-container">
             <h3 style="margin-top: 0;">Comparar múltiples días (máximo 12)</h3>
@@ -413,6 +470,7 @@
 <script type="module">
     // Variables globales
     let dbData = [];
+    let metasData = []; // { centro, año, mes, inst, crecimiento, bajas, perdidos }
     let centros = ['C.O LOS RUICES', 'C.O EL ROSAL', 'C.O EL PARAISO'];
     let myChart = null;
     let analisisChart = null;
@@ -420,8 +478,12 @@
     let multiChart = null;
     let metricaActual = 'instalaciones';
     let multiDayCount = 1;
+    let metasEditando = false;
+    let metasEditandoCentro = '';
+    let metasEditandoAño = '';
     
     const loadingDiv = document.getElementById('loading');
+    const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     
     function showLoading() { loadingDiv.style.display = 'block'; }
     function hideLoading() { loadingDiv.style.display = 'none'; }
@@ -440,7 +502,7 @@
     }
     
     function actualizarSelectoresCentro() {
-        const selects = ['centroSelect', 'filtroCentro', 'compCentroA', 'compCentroB', 'analisisCentro', 'multiCentro'];
+        const selects = ['centroSelect', 'filtroCentro', 'compCentroA', 'compCentroB', 'analisisCentro', 'multiCentro', 'metaCentroSelect'];
         selects.forEach(id => {
             const select = document.getElementById(id);
             if(select) {
@@ -479,171 +541,189 @@
         }
     }
     
-    // Obtener consolidado de UN Caracas
-    function getConsolidadoPorDia(data) {
-        const porDia = {};
-        
-        data.forEach(item => {
-            if(!porDia[item.fecha]) {
-                porDia[item.fecha] = {
-                    fecha: item.fecha,
-                    inst: 0, obj_inst: 0,
-                    crecimiento: 0, obj_crecimiento: 0,
-                    bajas: 0, obj_bajas: 0,
-                    perdidos: 0, obj_perdidos: 0
-                };
-            }
-            porDia[item.fecha].inst += item.inst;
-            porDia[item.fecha].obj_inst += item.obj_inst;
-            porDia[item.fecha].crecimiento += item.crecimiento;
-            porDia[item.fecha].obj_crecimiento += item.obj_crecimiento;
-            porDia[item.fecha].bajas += item.bajas;
-            porDia[item.fecha].obj_bajas += item.obj_bajas;
-            porDia[item.fecha].perdidos += item.perdidos;
-            porDia[item.fecha].obj_perdidos += item.obj_perdidos;
-        });
-        
-        return Object.values(porDia).sort((a,b) => a.fecha.localeCompare(b.fecha));
+    // Obtener meta mensual para un centro, año y mes específicos
+    function getMetaMensual(centro, año, mes) {
+        const meta = metasData.find(m => m.centro === centro && m.año === año && m.mes === mes);
+        return meta || { inst: 0, crecimiento: 0, bajas: 0, perdidos: 0 };
     }
     
-    // Comparativa Multi-Día
-    function agregarMultiDay() {
-        if(multiDayCount >= 12) {
-            alert("Máximo 12 días para comparar");
-            return;
-        }
-        
-        multiDayCount++;
-        const container = document.getElementById('multiDaysList');
-        const newDay = document.createElement('div');
-        newDay.className = 'day-item';
-        newDay.innerHTML = `
-            <input type="date" class="multi-day-input" id="multiDay${multiDayCount}" placeholder="Fecha ${multiDayCount}">
-            <button class="remove-day" data-day="${multiDayCount}">✖️</button>
-        `;
-        container.appendChild(newDay);
-        
-        newDay.querySelector('.remove-day').addEventListener('click', () => {
-            newDay.remove();
-            multiDayCount--;
-            // Renumerar
-            const items = document.querySelectorAll('#multiDaysList .day-item');
-            items.forEach((item, idx) => {
-                const input = item.querySelector('input');
-                if(input) input.id = `multiDay${idx + 1}`;
-                const btn = item.querySelector('.remove-day');
-                if(btn) btn.setAttribute('data-day', idx + 1);
-                if(idx === 0) {
-                    const firstBtn = item.querySelector('.remove-day');
-                    if(firstBtn) firstBtn.style.display = 'none';
-                } else {
-                    const showBtn = item.querySelector('.remove-day');
-                    if(showBtn) showBtn.style.display = 'block';
-                }
+    // Obtener meta de UN Caracas (suma de todos los centros)
+    function getMetaUN(año, mes) {
+        let suma = { inst: 0, crecimiento: 0, bajas: 0, perdidos: 0 };
+        centros.forEach(centro => {
+            const meta = getMetaMensual(centro, año, mes);
+            suma.inst += meta.inst;
+            suma.crecimiento += meta.crecimiento;
+            suma.bajas += meta.bajas;
+            suma.perdidos += meta.perdidos;
+        });
+        return suma;
+    }
+    
+    // Cargar metas desde Firebase
+    async function cargarMetasMensuales() {
+        try {
+            const q = query(collection(db, "kpi_metas_mensuales"));
+            const querySnapshot = await getDocs(q);
+            metasData = [];
+            querySnapshot.forEach((doc) => {
+                metasData.push({ id: doc.id, ...doc.data() });
             });
-        });
-        
-        // Mostrar botón de eliminar en todos excepto el primero
-        const firstRemoveBtn = document.querySelector('#multiDaysList .day-item:first-child .remove-day');
-        if(firstRemoveBtn) firstRemoveBtn.style.display = 'none';
+            return metasData;
+        } catch (error) {
+            console.error("Error cargando metas:", error);
+            return [];
+        }
     }
     
-    function compararMultiDias() {
-        const tipo = document.getElementById('multiTipo').value;
-        const centro = document.getElementById('multiCentro').value;
-        const metrica = document.getElementById('multiMetrica').value;
-        
-        // Recoger fechas seleccionadas
-        const fechas = [];
-        for(let i = 1; i <= multiDayCount; i++) {
-            const fechaInput = document.getElementById(`multiDay${i}`);
-            if(fechaInput && fechaInput.value) {
-                fechas.push(fechaInput.value);
-            }
-        }
-        
-        if(fechas.length === 0) {
-            alert("Selecciona al menos una fecha para comparar");
-            return;
-        }
-        
-        const labelsMap = {
-            'inst': 'Instalaciones',
-            'crecimiento': 'Crecimiento',
-            'bajas': 'Bajas Rezagadas Canceladas',
-            'perdidos': 'Clientes Perdidos'
-        };
-        
-        const labels = [];
-        const valoresReales = [];
-        const valoresMetas = [];
-        
-        if(tipo === 'centro') {
-            if(!centro) {
-                alert("Selecciona un centro de operaciones");
-                return;
-            }
+    // Guardar meta en Firebase
+    async function guardarMetaMensual(meta) {
+        try {
+            const q = query(collection(db, "kpi_metas_mensuales"));
+            const querySnapshot = await getDocs(q);
+            let existingDoc = null;
             
-            fechas.forEach(fecha => {
-                const registro = dbData.find(d => d.centro === centro && d.fecha === fecha);
-                labels.push(fecha);
-                if(registro) {
-                    valoresReales.push(registro[metrica]);
-                    valoresMetas.push(registro[`obj_${metrica}`]);
-                } else {
-                    valoresReales.push(0);
-                    valoresMetas.push(0);
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                if(data.centro === meta.centro && data.año === meta.año && data.mes === meta.mes) {
+                    existingDoc = { id: doc.id, ...data };
                 }
             });
-        } else {
-            // UN Caracas consolidado
-            const consolidado = getConsolidadoPorDia(dbData);
-            fechas.forEach(fecha => {
-                const registro = consolidado.find(d => d.fecha === fecha);
-                labels.push(fecha);
-                if(registro) {
-                    valoresReales.push(registro[metrica]);
-                    valoresMetas.push(registro[`obj_${metrica}`]);
-                } else {
-                    valoresReales.push(0);
-                    valoresMetas.push(0);
-                }
-            });
+            
+            if(existingDoc) {
+                const docRef = doc(db, "kpi_metas_mensuales", existingDoc.id);
+                await updateDoc(docRef, meta);
+            } else {
+                await addDoc(collection(db, "kpi_metas_mensuales"), meta);
+            }
+            return true;
+        } catch (error) {
+            console.error("Error guardando meta:", error);
+            return false;
+        }
+    }
+    
+    // Cargar metas en la tabla
+    async function cargarMetasTabla() {
+        const centro = document.getElementById('metaCentroSelect').value;
+        const año = document.getElementById('metaAño').value;
+        
+        if(!centro) {
+            alert("Selecciona un centro primero");
+            return;
         }
         
-        if(multiChart) multiChart.destroy();
-        const ctx = document.getElementById('graficaMultiDias').getContext('2d');
+        metasEditandoCentro = centro;
+        metasEditandoAño = año;
         
-        multiChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    { label: `${labelsMap[metrica]} (Real)`, data: valoresReales, backgroundColor: '#8b5cf6', borderRadius: 8 },
-                    { label: `${labelsMap[metrica]} (Meta)`, data: valoresMetas, type: 'line', borderColor: '#c4b5fd', borderWidth: 3, fill: false, tension: 0.1, pointRadius: 5, pointBackgroundColor: '#c4b5fd' }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    tooltip: { mode: 'index', intersect: false },
-                    legend: { position: 'top' },
-                    title: { 
-                        display: true, 
-                        text: tipo === 'centro' ? `${centro} - ${labelsMap[metrica]}` : `UN Caracas - ${labelsMap[metrica]}`,
-                        font: { size: 16 } 
-                    }
-                },
-                scales: {
-                    y: { beginAtZero: true, title: { display: true, text: labelsMap[metrica] } },
-                    x: { title: { display: true, text: 'Fecha' } }
+        await cargarMetasMensuales();
+        
+        const tbody = document.getElementById('metaTableBody');
+        tbody.innerHTML = '';
+        
+        for(let i = 0; i < 12; i++) {
+            const mesNum = i + 1;
+            const meta = getMetaMensual(centro, parseInt(año), mesNum);
+            
+            const row = tbody.insertRow();
+            row.innerHTML = `
+                <td><strong>${meses[i]}</strong></td>
+                <td><input type="number" id="meta_inst_${mesNum}" value="${meta.inst}" placeholder="0" style="width: 100px;"></td>
+                <td><input type="number" id="meta_crec_${mesNum}" value="${meta.crecimiento}" placeholder="0" style="width: 100px;"></td>
+                <td><input type="number" id="meta_bajas_${mesNum}" value="${meta.bajas}" placeholder="0" style="width: 100px;"></td>
+                <td><input type="number" id="meta_perd_${mesNum}" value="${meta.perdidos}" placeholder="0" style="width: 100px;"></td>
+                <td><button class="btn-warning edit-meta-btn" data-mes="${mesNum}" style="padding: 5px 10px; background: var(--warning); color: white; border: none; border-radius: 4px; cursor: pointer;">✏️ Editar</button></td>
+            `;
+        }
+        
+        // Agregar event listeners a los botones de edición
+        document.querySelectorAll('.edit-meta-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const mes = parseInt(btn.getAttribute('data-mes'));
+                const inst = document.getElementById(`meta_inst_${mes}`).value;
+                const crecimiento = document.getElementById(`meta_crec_${mes}`).value;
+                const bajas = document.getElementById(`meta_bajas_${mes}`).value;
+                const perdidos = document.getElementById(`meta_perd_${mes}`).value;
+                
+                const meta = {
+                    centro: centro,
+                    año: parseInt(año),
+                    mes: mes,
+                    inst: parseInt(inst) || 0,
+                    crecimiento: parseInt(crecimiento) || 0,
+                    bajas: parseInt(bajas) || 0,
+                    perdidos: parseInt(perdidos) || 0
+                };
+                
+                showLoading();
+                const success = await guardarMetaMensual(meta);
+                hideLoading();
+                
+                if(success) {
+                    alert(`Meta de ${meses[mes-1]} guardada correctamente`);
+                    await cargarMetasTabla();
+                } else {
+                    alert("Error al guardar la meta");
                 }
-            }
+            });
         });
     }
     
-    // CRUD Firebase
+    // Guardar todas las metas del centro
+    async function guardarTodasMetas() {
+        const centro = document.getElementById('metaCentroSelect').value;
+        const año = document.getElementById('metaAño').value;
+        
+        if(!centro) {
+            alert("Selecciona un centro primero");
+            return;
+        }
+        
+        showLoading();
+        let successCount = 0;
+        
+        for(let mes = 1; mes <= 12; mes++) {
+            const inst = document.getElementById(`meta_inst_${mes}`)?.value;
+            if(inst !== undefined) {
+                const meta = {
+                    centro: centro,
+                    año: parseInt(año),
+                    mes: mes,
+                    inst: parseInt(inst) || 0,
+                    crecimiento: parseInt(document.getElementById(`meta_crec_${mes}`).value) || 0,
+                    bajas: parseInt(document.getElementById(`meta_bajas_${mes}`).value) || 0,
+                    perdidos: parseInt(document.getElementById(`meta_perd_${mes}`).value) || 0
+                };
+                const success = await guardarMetaMensual(meta);
+                if(success) successCount++;
+            }
+        }
+        
+        hideLoading();
+        alert(`Se guardaron ${successCount} de 12 metas correctamente`);
+        await cargarMetasTabla();
+    }
+    
+    // Auto completar metas al seleccionar fecha en registro
+    async function autoCompletarMetasPorFecha() {
+        const centro = document.getElementById('centroSelect').value;
+        const fecha = document.getElementById('reg-fecha').value;
+        
+        if(!centro || !fecha) return;
+        
+        const año = parseInt(fecha.substring(0, 4));
+        const mes = parseInt(fecha.substring(5, 7));
+        
+        await cargarMetasMensuales();
+        const meta = getMetaMensual(centro, año, mes);
+        
+        document.getElementById('m-inst').value = meta.inst;
+        document.getElementById('m-crec').value = meta.crecimiento;
+        document.getElementById('m-bajas').value = meta.bajas;
+        document.getElementById('m-perd').value = meta.perdidos;
+    }
+    
+    // CRUD Firebase para datos diarios
     async function cargarDesdeFirebase() {
         showLoading();
         try {
@@ -674,17 +754,23 @@
         if(!centro) return alert("Por favor selecciona un Centro de Operaciones.");
         if(!fecha) return alert("Por favor selecciona una fecha.");
         
+        // Obtener metas del mes
+        const año = parseInt(fecha.substring(0, 4));
+        const mes = parseInt(fecha.substring(5, 7));
+        await cargarMetasMensuales();
+        const meta = getMetaMensual(centro, año, mes);
+        
         const row = {
             centro: centro,
             fecha: fecha,
             inst: Number(document.getElementById('r-inst').value || 0),
-            obj_inst: Number(document.getElementById('m-inst').value || 0),
+            obj_inst: meta.inst,
             crecimiento: Number(document.getElementById('r-crec').value || 0),
-            obj_crecimiento: Number(document.getElementById('m-crec').value || 0),
+            obj_crecimiento: meta.crecimiento,
             bajas: Number(document.getElementById('r-bajas').value || 0),
-            obj_bajas: Number(document.getElementById('m-bajas').value || 0),
+            obj_bajas: meta.bajas,
             perdidos: Number(document.getElementById('r-perd').value || 0),
-            obj_perdidos: Number(document.getElementById('m-perd').value || 0)
+            obj_perdidos: meta.perdidos
         };
         
         showLoading();
@@ -744,13 +830,12 @@
         document.getElementById('centroSelect').value = registro.centro;
         document.getElementById('reg-fecha').value = registro.fecha;
         document.getElementById('r-inst').value = registro.inst;
-        document.getElementById('m-inst').value = registro.obj_inst;
         document.getElementById('r-crec').value = registro.crecimiento;
-        document.getElementById('m-crec').value = registro.obj_crecimiento;
         document.getElementById('r-bajas').value = registro.bajas;
-        document.getElementById('m-bajas').value = registro.obj_bajas;
         document.getElementById('r-perd').value = registro.perdidos;
-        document.getElementById('m-perd').value = registro.obj_perdidos;
+        
+        // Cargar metas automáticamente
+        autoCompletarMetasPorFecha();
         
         openTab('registro');
     }
@@ -819,17 +904,21 @@
                     let f = r['Fecha'] instanceof Date ? r['Fecha'].toISOString().split('T')[0] : r['Fecha'];
                     if(!f) continue;
                     
+                    const año = parseInt(f.substring(0, 4));
+                    const mes = parseInt(f.substring(5, 7));
+                    const meta = getMetaMensual(centro, año, mes);
+                    
                     const data = {
                         centro: centro,
                         fecha: f,
                         inst: Number(r['Instalaciones'] || 0),
-                        obj_inst: Number(r['Objetivo Instalación'] || 0),
+                        obj_inst: meta.inst,
                         perdidos: Number(r['Clientes Perdidos'] || 0),
-                        obj_perdidos: Number(r['Objetivo Clientes Perdidos'] || 0),
+                        obj_perdidos: meta.perdidos,
                         bajas: Number(r['Bajas Rezagas Canceladas'] || 0),
-                        obj_bajas: Number(r['Objetivo Bajas'] || 0),
+                        obj_bajas: meta.bajas,
                         crecimiento: Number(r['Crecimiento'] || 0),
-                        obj_crecimiento: Number(r['Objetivo Crecimiento'] || 0)
+                        obj_crecimiento: meta.crecimiento
                     };
                     
                     const q = query(collection(db, "kpi_dashboard_multi"));
@@ -896,7 +985,7 @@
         XLSX.writeFile(wb, `KPI_MultiCentro_${new Date().toISOString().split('T')[0]}.xlsx`);
     }
     
-    // Comparativa entre centros (2 elementos)
+    // Comparativa entre centros
     function compararCentros() {
         const centroA = document.getElementById('compCentroA').value;
         const fechaA = document.getElementById('compFechaA').value;
@@ -1067,6 +1156,32 @@
     }
     
     // UN Caracas
+    function getConsolidadoPorDia(data) {
+        const porDia = {};
+        
+        data.forEach(item => {
+            if(!porDia[item.fecha]) {
+                porDia[item.fecha] = {
+                    fecha: item.fecha,
+                    inst: 0, obj_inst: 0,
+                    crecimiento: 0, obj_crecimiento: 0,
+                    bajas: 0, obj_bajas: 0,
+                    perdidos: 0, obj_perdidos: 0
+                };
+            }
+            porDia[item.fecha].inst += item.inst;
+            porDia[item.fecha].obj_inst += item.obj_inst;
+            porDia[item.fecha].crecimiento += item.crecimiento;
+            porDia[item.fecha].obj_crecimiento += item.obj_crecimiento;
+            porDia[item.fecha].bajas += item.bajas;
+            porDia[item.fecha].obj_bajas += item.obj_bajas;
+            porDia[item.fecha].perdidos += item.perdidos;
+            porDia[item.fecha].obj_perdidos += item.obj_perdidos;
+        });
+        
+        return Object.values(porDia).sort((a,b) => a.fecha.localeCompare(b.fecha));
+    }
+    
     function getConsolidadoPorPeriodo(data, agrupacion, año) {
         const porDia = getConsolidadoPorDia(data);
         
@@ -1132,7 +1247,7 @@
         return [];
     }
     
-    function actualizarUNCaracas() {
+    async function actualizarUNCaracas() {
         if(dbData.length === 0) return;
         
         const metrica = document.getElementById('unMetrica').value;
@@ -1146,6 +1261,8 @@
             'perdidos': 'Clientes Perdidos'
         };
         
+        await cargarMetasMensuales();
+        
         const consolidado = getConsolidadoPorPeriodo(dbData, agrupacion, año);
         
         if(consolidado.length === 0) {
@@ -1155,13 +1272,30 @@
         
         const ultimo = consolidado[consolidado.length - 1];
         document.getElementById('unCrecimiento').textContent = ultimo.crecimiento || 0;
-        document.getElementById('unCrecimientoMeta').textContent = `Meta: ${ultimo.obj_crecimiento || 0}`;
         document.getElementById('unInstalaciones').textContent = ultimo.inst || 0;
-        document.getElementById('unInstalacionesMeta').textContent = `Meta: ${ultimo.obj_inst || 0}`;
         document.getElementById('unBajas').textContent = ultimo.bajas || 0;
-        document.getElementById('unBajasMeta').textContent = `Meta: ${ultimo.obj_bajas || 0}`;
         document.getElementById('unPerdidos').textContent = ultimo.perdidos || 0;
-        document.getElementById('unPerdidosMeta').textContent = `Meta: ${ultimo.obj_perdidos || 0}`;
+        
+        // Para UN Caracas, la meta es la suma de las metas de todos los centros
+        if(agrupacion === 'mes' && año) {
+            let sumaMetas = { inst: 0, crecimiento: 0, bajas: 0, perdidos: 0 };
+            for(let mes = 1; mes <= 12; mes++) {
+                const metaUN = getMetaUN(parseInt(año), mes);
+                sumaMetas.inst += metaUN.inst;
+                sumaMetas.crecimiento += metaUN.crecimiento;
+                sumaMetas.bajas += metaUN.bajas;
+                sumaMetas.perdidos += metaUN.perdidos;
+            }
+            document.getElementById('unInstalacionesMeta').textContent = `Meta Anual: ${sumaMetas.inst}`;
+            document.getElementById('unCrecimientoMeta').textContent = `Meta Anual: ${sumaMetas.crecimiento}`;
+            document.getElementById('unBajasMeta').textContent = `Meta Anual: ${sumaMetas.bajas}`;
+            document.getElementById('unPerdidosMeta').textContent = `Meta Anual: ${sumaMetas.perdidos}`;
+        } else {
+            document.getElementById('unInstalacionesMeta').textContent = `Meta: ${ultimo.obj_inst || 0}`;
+            document.getElementById('unCrecimientoMeta').textContent = `Meta: ${ultimo.obj_crecimiento || 0}`;
+            document.getElementById('unBajasMeta').textContent = `Meta: ${ultimo.obj_bajas || 0}`;
+            document.getElementById('unPerdidosMeta').textContent = `Meta: ${ultimo.obj_perdidos || 0}`;
+        }
         
         let labels, valoresReales, valoresMetas;
         
@@ -1175,7 +1309,15 @@
                 return fecha.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
             });
             valoresReales = consolidado.map(d => d[metrica]);
-            valoresMetas = consolidado.map(d => d[`obj_${metrica}`]);
+            // Para metas mensuales de UN, sumar metas de todos los centros por mes
+            valoresMetas = [];
+            for(let i = 0; i < consolidado.length; i++) {
+                const fecha = new Date(consolidado[i].fecha);
+                const mesNum = fecha.getMonth() + 1;
+                const añoNum = fecha.getFullYear();
+                const metaUN = getMetaUN(añoNum, mesNum);
+                valoresMetas.push(metaUN[metrica]);
+            }
         } else {
             labels = consolidado.map(d => d.fecha);
             valoresReales = consolidado.map(d => d[metrica]);
@@ -1210,7 +1352,139 @@
         });
     }
     
-    // Mostrar/ocultar selector de centro según tipo
+    // Comparativa Multi-Día
+    function agregarMultiDay() {
+        if(multiDayCount >= 12) {
+            alert("Máximo 12 días para comparar");
+            return;
+        }
+        
+        multiDayCount++;
+        const container = document.getElementById('multiDaysList');
+        const newDay = document.createElement('div');
+        newDay.className = 'day-item';
+        newDay.innerHTML = `
+            <input type="date" class="multi-day-input" id="multiDay${multiDayCount}" placeholder="Fecha ${multiDayCount}">
+            <button class="remove-day" data-day="${multiDayCount}">✖️</button>
+        `;
+        container.appendChild(newDay);
+        
+        newDay.querySelector('.remove-day').addEventListener('click', () => {
+            newDay.remove();
+            multiDayCount--;
+            const items = document.querySelectorAll('#multiDaysList .day-item');
+            items.forEach((item, idx) => {
+                const input = item.querySelector('input');
+                if(input) input.id = `multiDay${idx + 1}`;
+                const btn = item.querySelector('.remove-day');
+                if(btn) btn.setAttribute('data-day', idx + 1);
+                if(idx === 0) {
+                    const firstBtn = item.querySelector('.remove-day');
+                    if(firstBtn) firstBtn.style.display = 'none';
+                } else {
+                    const showBtn = item.querySelector('.remove-day');
+                    if(showBtn) showBtn.style.display = 'block';
+                }
+            });
+        });
+        
+        const firstRemoveBtn = document.querySelector('#multiDaysList .day-item:first-child .remove-day');
+        if(firstRemoveBtn) firstRemoveBtn.style.display = 'none';
+    }
+    
+    function compararMultiDias() {
+        const tipo = document.getElementById('multiTipo').value;
+        const centro = document.getElementById('multiCentro').value;
+        const metrica = document.getElementById('multiMetrica').value;
+        
+        const fechas = [];
+        for(let i = 1; i <= multiDayCount; i++) {
+            const fechaInput = document.getElementById(`multiDay${i}`);
+            if(fechaInput && fechaInput.value) {
+                fechas.push(fechaInput.value);
+            }
+        }
+        
+        if(fechas.length === 0) {
+            alert("Selecciona al menos una fecha para comparar");
+            return;
+        }
+        
+        const labelsMap = {
+            'inst': 'Instalaciones',
+            'crecimiento': 'Crecimiento',
+            'bajas': 'Bajas Rezagadas Canceladas',
+            'perdidos': 'Clientes Perdidos'
+        };
+        
+        const labels = [];
+        const valoresReales = [];
+        const valoresMetas = [];
+        
+        if(tipo === 'centro') {
+            if(!centro) {
+                alert("Selecciona un centro de operaciones");
+                return;
+            }
+            
+            fechas.forEach(fecha => {
+                const registro = dbData.find(d => d.centro === centro && d.fecha === fecha);
+                labels.push(fecha);
+                if(registro) {
+                    valoresReales.push(registro[metrica]);
+                    valoresMetas.push(registro[`obj_${metrica}`]);
+                } else {
+                    valoresReales.push(0);
+                    valoresMetas.push(0);
+                }
+            });
+        } else {
+            const consolidado = getConsolidadoPorDia(dbData);
+            fechas.forEach(fecha => {
+                const registro = consolidado.find(d => d.fecha === fecha);
+                labels.push(fecha);
+                if(registro) {
+                    valoresReales.push(registro[metrica]);
+                    valoresMetas.push(registro[`obj_${metrica}`]);
+                } else {
+                    valoresReales.push(0);
+                    valoresMetas.push(0);
+                }
+            });
+        }
+        
+        if(multiChart) multiChart.destroy();
+        const ctx = document.getElementById('graficaMultiDias').getContext('2d');
+        
+        multiChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: `${labelsMap[metrica]} (Real)`, data: valoresReales, backgroundColor: '#8b5cf6', borderRadius: 8 },
+                    { label: `${labelsMap[metrica]} (Meta)`, data: valoresMetas, type: 'line', borderColor: '#c4b5fd', borderWidth: 3, fill: false, tension: 0.1, pointRadius: 5, pointBackgroundColor: '#c4b5fd' }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    tooltip: { mode: 'index', intersect: false },
+                    legend: { position: 'top' },
+                    title: { 
+                        display: true, 
+                        text: tipo === 'centro' ? `${centro} - ${labelsMap[metrica]}` : `UN Caracas - ${labelsMap[metrica]}`,
+                        font: { size: 16 } 
+                    }
+                },
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: labelsMap[metrica] } },
+                    x: { title: { display: true, text: 'Fecha' } }
+                }
+            }
+        });
+    }
+    
     function toggleMultiCentro() {
         const tipo = document.getElementById('multiTipo').value;
         const centroContainer = document.getElementById('multiCentroContainer');
@@ -1243,6 +1517,11 @@
     document.getElementById('btnCompararMultiDias')?.addEventListener('click', compararMultiDias);
     document.getElementById('addMultiDayBtn')?.addEventListener('click', agregarMultiDay);
     document.getElementById('multiTipo')?.addEventListener('change', toggleMultiCentro);
+    document.getElementById('btnCargarMetas')?.addEventListener('click', cargarMetasTabla);
+    document.getElementById('btnGuardarMetas')?.addEventListener('click', guardarTodasMetas);
+    document.getElementById('centroSelect')?.addEventListener('change', autoCompletarMetasPorFecha);
+    document.getElementById('reg-fecha')?.addEventListener('change', autoCompletarMetasPorFecha);
+    
     document.getElementById('btnAgregarCentro')?.addEventListener('click', () => {
         const nuevo = document.getElementById('nuevoCentro').value.trim();
         if(nuevo && !centros.includes(nuevo)) {
@@ -1257,6 +1536,7 @@
             alert('Ingrese un nombre válido');
         }
     });
+    
     document.getElementById('filtroCentro')?.addEventListener('change', renderTable);
     document.getElementById('agrupacion')?.addEventListener('change', actualizarGraficaAnalisis);
     document.getElementById('añoFiltroAnalisis')?.addEventListener('change', actualizarGraficaAnalisis);
@@ -1278,9 +1558,11 @@
     document.getElementById('reg-fecha').value = new Date().toISOString().split('T')[0];
     document.getElementById('añoFiltroAnalisis').value = new Date().getFullYear();
     document.getElementById('unAño').value = new Date().getFullYear();
+    document.getElementById('metaAño').value = new Date().getFullYear();
     document.getElementById('multiDay1').value = new Date().toISOString().split('T')[0];
     cargarCentros();
     toggleMultiCentro();
+    cargarMetasMensuales();
     
     const checkAuth = setInterval(() => {
         if(window.db) {
