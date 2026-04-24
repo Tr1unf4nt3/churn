@@ -140,7 +140,7 @@
         
         /* Estilos para Comparativa Multi-Elemento */
         .comparison-elements { background: #f8fafc; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
-        .elements-list { display: flex; flex-direction: column; gap: 15px; margin-bottom: 15px; max-height: 400px; overflow-y: auto; }
+        .elements-list { display: flex; flex-direction: column; gap: 15px; margin-bottom: 15px; max-height: 500px; overflow-y: auto; }
         .element-item { background: white; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; display: grid; grid-template-columns: 1fr 1fr auto; gap: 15px; align-items: center; }
         .element-item select, .element-item input { margin: 0; }
         .element-item .remove-element { background: var(--danger); color: white; border: none; border-radius: 6px; cursor: pointer; padding: 10px; width: 40px; }
@@ -315,11 +315,11 @@
         </div>
     </div>
 
-    <!-- Pestaña Comparativa Centro (MEJORADA - Multi-Elemento) -->
+    <!-- Pestaña Comparativa Centro (MEJORADA - Multi-Elemento SIN LÍMITE) -->
     <div id="comparativa" class="content">
         <div class="comparison-elements">
             <h3 style="margin-top: 0;">📊 Comparar Múltiples Elementos</h3>
-            <p style="color: var(--secondary); margin-bottom: 15px;">Agrega hasta 12 elementos para comparar (Centro + Fecha). Cada elemento se mostrará con un color diferente.</p>
+            <p style="color: var(--secondary); margin-bottom: 15px;">Agrega todos los elementos que necesites para comparar (Centro + Fecha). Puedes agregar tantos como centros de operaciones tengas.</p>
             
             <div class="elements-list" id="elementsList">
                 <div class="element-item" data-index="0">
@@ -331,7 +331,7 @@
                 </div>
             </div>
             
-            <button class="add-element-btn" id="addElementBtn">+ Agregar otro elemento (máx 12)</button>
+            <button class="add-element-btn" id="addElementBtn">+ Agregar otro elemento</button>
             
             <div class="filter-bar" style="margin-top: 20px;">
                 <div class="filter-item">
@@ -531,7 +531,7 @@
     
     const loadingDiv = document.getElementById('loading');
     const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-    const colores = ['#2563eb', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#6366f1', '#14b8a6', '#f97316', '#d946ef'];
+    const colores = ['#2563eb', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#6366f1', '#14b8a6', '#f97316', '#d946ef', '#10b981', '#3b82f6', '#a855f7', '#eab308', '#ef4444', '#22c55e'];
     
     function showLoading() { loadingDiv.style.display = 'block'; }
     function hideLoading() { loadingDiv.style.display = 'none'; }
@@ -673,7 +673,7 @@
                 <td><input type="number" id="meta_crec_${mesNum}" value="${meta.crecimiento}" placeholder="0" style="width: 100px;"></td>
                 <td><input type="number" id="meta_bajas_${mesNum}" value="${meta.bajas}" placeholder="0" style="width: 100px;"></td>
                 <td><input type="number" id="meta_perd_${mesNum}" value="${meta.perdidos}" placeholder="0" style="width: 100px;"></td>
-                <td><button class="edit-meta-btn" data-mes="${mesNum}" style="padding: 5px 10px; background: var(--warning); color: white; border: none; border-radius: 4px; cursor: pointer;">✏️ Guardar Mes</button>
+                <table><button class="edit-meta-btn" data-mes="${mesNum}" style="padding: 5px 10px; background: var(--warning); color: white; border: none; border-radius: 4px; cursor: pointer;">✏️ Guardar Mes</button>
             `;
         }
         document.querySelectorAll('.edit-meta-btn').forEach(btn => {
@@ -823,7 +823,7 @@
                 <td>${d.bajas} <span class="goal-tag ${getMetaStatusClass(d.bajas, d.obj_bajas, 'bajas')}">M: ${d.obj_bajas}</span></td>
                 <td>${d.perdidos} <span class="goal-tag ${getMetaStatusClass(d.perdidos, d.obj_perdidos, 'perdidos')}">M: ${d.obj_perdidos}</span></td>
                 <td><button class="edit-btn" data-registro='${JSON.stringify(d)}'>✏️ Editar</button>
-                <button class="delete-btn" data-id="${d.id}">🗑️ Eliminar</button></tr>
+                <button class="delete-btn" data-id="${d.id}">🗑️ Eliminar</button></td>
             </tr>
         `).join('');
         document.querySelectorAll('.edit-btn').forEach(btn => btn.addEventListener('click', () => editarRegistro(JSON.parse(btn.getAttribute('data-registro')))));
@@ -891,10 +891,8 @@
         XLSX.writeFile(wb, `KPI_${new Date().toISOString().split('T')[0]}.xlsx`);
     }
     
-    // COMPARATIVA MULTI-ELEMENTO (NUEVA)
+    // COMPARATIVA MULTI-ELEMENTO (SIN LÍMITE)
     function agregarElemento() {
-        if(elementCount >= 12) { alert("Máximo 12 elementos para comparar"); return; }
-        
         elementCount++;
         const container = document.getElementById('elementsList');
         const newElement = document.createElement('div');
