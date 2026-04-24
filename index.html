@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KPI Dashboard Pro - v15.0 (Clientes Perdidos invertido)</title>
+    <title>KPI Dashboard Pro - v16.0 (Corregido)</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
@@ -95,7 +95,7 @@
 
         .chart-container { margin-top: 20px; height: 500px; background: #fff; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; }
         .kpi-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .kpi-card { background: linear-gradient(135deg, var(--un-color) 0%, #7c3aed 100%); color: white; padding: 20px; border-radius: 12px; text-align: center; }
+        .kpi-card { background: linear-gradient(135deg, var(--un-color) 0%, #7c3aed 100%); color: white; padding: 20px; border-radius: 12px; text-align: center; transition: 0.3s; }
         .kpi-card h3 { margin: 0 0 10px 0; font-size: 14px; opacity: 0.9; }
         .kpi-card .value { font-size: 32px; font-weight: bold; margin: 10px 0; }
         .kpi-card .meta { font-size: 12px; opacity: 0.8; }
@@ -197,7 +197,7 @@
                 </div>
             </div>
             <div class="form-section">
-                <label class="section-title">📉 Clientes Perdidos <span style="color: var(--danger); font-size: 11px;">(💡 Meta se cumple cuando el valor REAL es MENOR o IGUAL)</span></label>
+                <label class="section-title">📉 Clientes Perdidos <span style="color: var(--danger); font-size: 11px;">(💡 Meta se cumple cuando REAL ≤ META)</span></label>
                 <div class="input-group">
                     <div class="input-row"><label>Real:</label><input type="number" id="r-perd" placeholder="0"></div>
                     <div class="input-row"><label>Meta:</label><input type="number" id="m-perd" placeholder="0" readonly style="background: #f1f5f9;"></div>
@@ -297,7 +297,7 @@
         </div>
     </div>
 
-    <!-- Pestaña Comparativa Centro (2 elementos) -->
+    <!-- Pestaña Comparativa Centro -->
     <div id="comparativa" class="content">
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
             <div style="background: #f8fafc; padding: 15px; border-radius: 8px;">
@@ -362,7 +362,7 @@
         </div>
     </div>
 
-    <!-- Pestaña UN Caracas (MEJORADA) -->
+    <!-- Pestaña UN Caracas -->
     <div id="unidad" class="content">
         <div style="background: linear-gradient(135deg, var(--un-color) 0%, #7c3aed 100%); padding: 30px; border-radius: 12px; margin-bottom: 30px; text-align: center; color: white;">
             <h2 style="margin: 0; font-size: 28px;">⭐ UN Caracas</h2>
@@ -505,12 +505,12 @@
     function showLoading() { loadingDiv.style.display = 'block'; }
     function hideLoading() { loadingDiv.style.display = 'none'; }
     
-    // Función para verificar si se cumplió la meta (considerando que para perdidos es inverso)
+    // Función para verificar si se cumplió la meta (para perdidos es inverso)
     function isMetaAlcanzada(real, meta, metrica) {
         if(metrica === 'perdidos') {
-            return real <= meta;
+            return real <= meta;  // Bueno: real menor o igual a la meta
         }
-        return real >= meta;
+        return real >= meta;  // Bueno: real mayor o igual a la meta
     }
     
     // Función para obtener clase CSS según cumplimiento de meta
@@ -524,12 +524,14 @@
     // Actualizar color de tarjetas KPI según cumplimiento de meta
     function updateKPICardColor(cardId, real, meta, metrica) {
         const card = document.getElementById(cardId);
-        if(card && isMetaAlcanzada(real, meta, metrica)) {
-            card.classList.add('met-success');
-            card.classList.remove('met-danger');
-        } else if(card) {
-            card.classList.add('met-danger');
-            card.classList.remove('met-success');
+        if(card) {
+            if(isMetaAlcanzada(real, meta, metrica)) {
+                card.classList.add('met-success');
+                card.classList.remove('met-danger');
+            } else {
+                card.classList.add('met-danger');
+                card.classList.remove('met-success');
+            }
         }
     }
     
@@ -1010,7 +1012,7 @@
         });
     }
     
-    // UN Caracas MEJORADA
+    // UN Caracas
     function getConsolidadoPorDia(data) {
         const porDia = {};
         data.forEach(item => {
@@ -1067,7 +1069,6 @@
                 tituloGrafica = `Rango: ${desde} al ${hasta}`;
             }
         } else {
-            // Agrupado por mes (último día)
             const porMes = {};
             consolidado.forEach(dia => {
                 const mes = dia.fecha.substring(0, 7);
@@ -1079,7 +1080,6 @@
         
         if(datosFiltrados.length === 0) {
             if(unChart) unChart.destroy();
-            // Resetear KPI cards
             ['Crecimiento', 'Instalaciones', 'Bajas', 'Perdidos'].forEach(k => {
                 document.getElementById(`un${k}`).textContent = '-';
                 document.getElementById(`un${k}Meta`).textContent = 'Meta: -';
@@ -1087,32 +1087,47 @@
             return;
         }
         
-        // Calcular totales para KPI cards
-        let totalReal = 0, totalMeta = 0;
+        // Calcular totales para cada métrica individualmente (CORREGIDO)
+        let totalInst = 0, totalMetaInst = 0;
+        let totalCrec = 0, totalMetaCrec = 0;
+        let totalBajas = 0, totalMetaBajas = 0;
+        let totalPerdidos = 0, totalMetaPerdidos = 0;
+        
         datosFiltrados.forEach(d => {
-            totalReal += d[metrica];
-            totalMeta += d[`obj_${metrica}`];
+            totalInst += d.inst;
+            totalMetaInst += d.obj_inst;
+            totalCrec += d.crecimiento;
+            totalMetaCrec += d.obj_crecimiento;
+            totalBajas += d.bajas;
+            totalMetaBajas += d.obj_bajas;
+            totalPerdidos += d.perdidos;
+            totalMetaPerdidos += d.obj_perdidos;
         });
         
-        const ultimo = datosFiltrados[datosFiltrados.length - 1];
-        document.getElementById('unCrecimiento').textContent = totalReal;
-        document.getElementById('unInstalaciones').textContent = totalReal;
-        document.getElementById('unBajas').textContent = totalReal;
-        document.getElementById('unPerdidos').textContent = totalReal;
-        document.getElementById('unCrecimientoMeta').textContent = `Meta: ${totalMeta}`;
-        document.getElementById('unInstalacionesMeta').textContent = `Meta: ${totalMeta}`;
-        document.getElementById('unBajasMeta').textContent = `Meta: ${totalMeta}`;
-        document.getElementById('unPerdidosMeta').textContent = `Meta: ${totalMeta}`;
+        // Actualizar valores en las tarjetas KPI
+        document.getElementById('unInstalaciones').textContent = totalInst;
+        document.getElementById('unInstalacionesMeta').textContent = `Meta: ${totalMetaInst}`;
+        document.getElementById('unCrecimiento').textContent = totalCrec;
+        document.getElementById('unCrecimientoMeta').textContent = `Meta: ${totalMetaCrec}`;
+        document.getElementById('unBajas').textContent = totalBajas;
+        document.getElementById('unBajasMeta').textContent = `Meta: ${totalMetaBajas}`;
+        document.getElementById('unPerdidos').textContent = totalPerdidos;
+        document.getElementById('unPerdidosMeta').textContent = `Meta: ${totalMetaPerdidos}`;
         
-        // Actualizar colores de KPI cards según cumplimiento de meta
-        updateKPICardColor('cardCrecimiento', totalReal, totalMeta, metrica);
-        updateKPICardColor('cardInstalaciones', totalReal, totalMeta, metrica);
-        updateKPICardColor('cardBajas', totalReal, totalMeta, metrica);
-        updateKPICardColor('cardPerdidos', totalReal, totalMeta, metrica);
+        // Actualizar colores de las tarjetas según la métrica específica
+        updateKPICardColor('cardInstalaciones', totalInst, totalMetaInst, 'inst');
+        updateKPICardColor('cardCrecimiento', totalCrec, totalMetaCrec, 'crecimiento');
+        updateKPICardColor('cardBajas', totalBajas, totalMetaBajas, 'bajas');
+        updateKPICardColor('cardPerdidos', totalPerdidos, totalMetaPerdidos, 'perdidos');
         
-        let labels = datosFiltrados.map(d => d.fecha);
+        // Gráfica con la métrica seleccionada
         let valoresReales = datosFiltrados.map(d => d[metrica]);
         let valoresMetas = datosFiltrados.map(d => d[`obj_${metrica}`]);
+        let labels = datosFiltrados.map(d => d.fecha);
+        
+        if(tipoVista === 'mes' && datosFiltrados.length > 0) {
+            labels = datosFiltrados.map(d => d.fecha.split('-')[2]);
+        }
         
         if(unChart) unChart.destroy();
         unChart = new Chart(document.getElementById('graficaUN').getContext('2d'), {
@@ -1137,6 +1152,13 @@
         newDay.querySelector('.remove-day').addEventListener('click', () => {
             newDay.remove();
             multiDayCount--;
+            // Renumerar
+            const items = document.querySelectorAll('#multiDaysList .day-item');
+            items.forEach((item, idx) => {
+                const input = item.querySelector('input');
+                if(input) input.id = `multiDay${idx + 1}`;
+                if(idx === 0) item.querySelector('.remove-day')?.remove();
+            });
         });
         document.querySelector('#multiDaysList .day-item:first-child .remove-day')?.remove();
     }
@@ -1236,6 +1258,8 @@
     document.getElementById('añoFiltroAnalisis').value = new Date().getFullYear();
     document.getElementById('unDia').value = new Date().toISOString().split('T')[0];
     document.getElementById('unMes').value = new Date().toISOString().substring(0, 7);
+    document.getElementById('unFechaDesde').value = new Date().toISOString().split('T')[0];
+    document.getElementById('unFechaHasta').value = new Date().toISOString().split('T')[0];
     document.getElementById('metaAño').value = new Date().getFullYear();
     document.getElementById('multiDay1').value = new Date().toISOString().split('T')[0];
     cargarCentros();
