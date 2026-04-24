@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KPI Dashboard Pro - v16.0 (Corregido)</title>
+    <title>KPI Dashboard Pro - v17.0 (Meta como línea)</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
@@ -362,7 +362,7 @@
         </div>
     </div>
 
-    <!-- Pestaña UN Caracas -->
+    <!-- Pestaña UN Caracas (MEJORADA - con filtro por centro) -->
     <div id="unidad" class="content">
         <div style="background: linear-gradient(135deg, var(--un-color) 0%, #7c3aed 100%); padding: 30px; border-radius: 12px; margin-bottom: 30px; text-align: center; color: white;">
             <h2 style="margin: 0; font-size: 28px;">⭐ UN Caracas</h2>
@@ -370,6 +370,12 @@
         </div>
         
         <div class="un-filters">
+            <div class="un-filter-item">
+                <label>🏢 Centro (opcional):</label>
+                <select id="unCentroFiltro">
+                    <option value="todos">Todos los centros</option>
+                </select>
+            </div>
             <div class="un-filter-item">
                 <label>📊 Métrica</label>
                 <select id="unMetrica">
@@ -505,23 +511,18 @@
     function showLoading() { loadingDiv.style.display = 'block'; }
     function hideLoading() { loadingDiv.style.display = 'none'; }
     
-    // Función para verificar si se cumplió la meta (para perdidos es inverso)
     function isMetaAlcanzada(real, meta, metrica) {
         if(metrica === 'perdidos') {
-            return real <= meta;  // Bueno: real menor o igual a la meta
+            return real <= meta;
         }
-        return real >= meta;  // Bueno: real mayor o igual a la meta
+        return real >= meta;
     }
     
-    // Función para obtener clase CSS según cumplimiento de meta
     function getMetaStatusClass(real, meta, metrica) {
-        if(isMetaAlcanzada(real, meta, metrica)) {
-            return 'goal-met';
-        }
+        if(isMetaAlcanzada(real, meta, metrica)) return 'goal-met';
         return 'goal-not-met';
     }
     
-    // Actualizar color de tarjetas KPI según cumplimiento de meta
     function updateKPICardColor(cardId, real, meta, metrica) {
         const card = document.getElementById(cardId);
         if(card) {
@@ -535,26 +536,23 @@
         }
     }
     
-    // Guardar centros
     function guardarCentros() {
         localStorage.setItem('kpi_centros', JSON.stringify(centros));
     }
     
     function cargarCentros() {
         const saved = localStorage.getItem('kpi_centros');
-        if(saved) {
-            centros = JSON.parse(saved);
-        }
+        if(saved) centros = JSON.parse(saved);
         actualizarSelectoresCentro();
     }
     
     function actualizarSelectoresCentro() {
-        const selects = ['centroSelect', 'filtroCentro', 'compCentroA', 'compCentroB', 'analisisCentro', 'multiCentro', 'metaCentroSelect'];
+        const selects = ['centroSelect', 'filtroCentro', 'compCentroA', 'compCentroB', 'analisisCentro', 'multiCentro', 'metaCentroSelect', 'unCentroFiltro'];
         selects.forEach(id => {
             const select = document.getElementById(id);
             if(select) {
                 const valorActual = select.value;
-                select.innerHTML = '<option value="">Seleccionar Centro...</option>';
+                select.innerHTML = id === 'unCentroFiltro' ? '<option value="todos">Todos los centros</option>' : '<option value="">Seleccionar Centro...</option>';
                 centros.forEach(centro => {
                     const option = document.createElement('option');
                     option.value = centro;
@@ -562,6 +560,7 @@
                     select.appendChild(option);
                 });
                 if(centros.includes(valorActual)) select.value = valorActual;
+                if(id === 'unCentroFiltro' && valorActual === 'todos') select.value = 'todos';
             }
         });
         
@@ -588,22 +587,9 @@
         }
     }
     
-    // Metas
     function getMetaMensual(centro, año, mes) {
         const meta = metasData.find(m => m.centro === centro && m.año === año && m.mes === mes);
         return meta || { inst: 0, crecimiento: 0, bajas: 0, perdidos: 0 };
-    }
-    
-    function getMetaUN(año, mes) {
-        let suma = { inst: 0, crecimiento: 0, bajas: 0, perdidos: 0 };
-        centros.forEach(centro => {
-            const meta = getMetaMensual(centro, año, mes);
-            suma.inst += meta.inst;
-            suma.crecimiento += meta.crecimiento;
-            suma.bajas += meta.bajas;
-            suma.perdidos += meta.perdidos;
-        });
-        return suma;
     }
     
     async function cargarMetasMensuales() {
@@ -611,14 +597,9 @@
             const q = query(collection(db, "kpi_metas_mensuales"));
             const querySnapshot = await getDocs(q);
             metasData = [];
-            querySnapshot.forEach((doc) => {
-                metasData.push({ id: doc.id, ...doc.data() });
-            });
+            querySnapshot.forEach((doc) => metasData.push({ id: doc.id, ...doc.data() }));
             return metasData;
-        } catch (error) {
-            console.error("Error cargando metas:", error);
-            return [];
-        }
+        } catch (error) { return []; }
     }
     
     async function guardarMetaMensual(meta) {
@@ -626,45 +607,26 @@
             const q = query(collection(db, "kpi_metas_mensuales"));
             const querySnapshot = await getDocs(q);
             let existingDoc = null;
-            
             querySnapshot.forEach((doc) => {
                 const data = doc.data();
-                if(data.centro === meta.centro && data.año === meta.año && data.mes === meta.mes) {
-                    existingDoc = { id: doc.id, ...data };
-                }
+                if(data.centro === meta.centro && data.año === meta.año && data.mes === meta.mes) existingDoc = { id: doc.id, ...data };
             });
-            
-            if(existingDoc) {
-                const docRef = doc(db, "kpi_metas_mensuales", existingDoc.id);
-                await updateDoc(docRef, meta);
-            } else {
-                await addDoc(collection(db, "kpi_metas_mensuales"), meta);
-            }
+            if(existingDoc) await updateDoc(doc(db, "kpi_metas_mensuales", existingDoc.id), meta);
+            else await addDoc(collection(db, "kpi_metas_mensuales"), meta);
             return true;
-        } catch (error) {
-            console.error("Error guardando meta:", error);
-            return false;
-        }
+        } catch (error) { return false; }
     }
     
     async function cargarMetasTabla() {
         const centro = document.getElementById('metaCentroSelect').value;
         const año = document.getElementById('metaAño').value;
-        
-        if(!centro) {
-            alert("Selecciona un centro primero");
-            return;
-        }
-        
+        if(!centro) { alert("Selecciona un centro primero"); return; }
         await cargarMetasMensuales();
-        
         const tbody = document.getElementById('metaTableBody');
         tbody.innerHTML = '';
-        
         for(let i = 0; i < 12; i++) {
             const mesNum = i + 1;
             const meta = getMetaMensual(centro, parseInt(año), mesNum);
-            
             const row = tbody.insertRow();
             row.innerHTML = `
                 <td><strong>${meses[i]}</strong></td>
@@ -675,14 +637,11 @@
                 <td><button class="edit-meta-btn" data-mes="${mesNum}" style="padding: 5px 10px; background: var(--warning); color: white; border: none; border-radius: 4px; cursor: pointer;">✏️ Guardar Mes</button>
             `;
         }
-        
         document.querySelectorAll('.edit-meta-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const mes = parseInt(btn.getAttribute('data-mes'));
                 const meta = {
-                    centro: centro,
-                    año: parseInt(año),
-                    mes: mes,
+                    centro, año: parseInt(año), mes,
                     inst: parseInt(document.getElementById(`meta_inst_${mes}`).value) || 0,
                     crecimiento: parseInt(document.getElementById(`meta_crec_${mes}`).value) || 0,
                     bajas: parseInt(document.getElementById(`meta_bajas_${mes}`).value) || 0,
@@ -701,12 +660,11 @@
         const centro = document.getElementById('metaCentroSelect').value;
         const año = document.getElementById('metaAño').value;
         if(!centro) { alert("Selecciona un centro"); return; }
-        
         showLoading();
         let successCount = 0;
         for(let mes = 1; mes <= 12; mes++) {
             const meta = {
-                centro: centro, año: parseInt(año), mes: mes,
+                centro, año: parseInt(año), mes,
                 inst: parseInt(document.getElementById(`meta_inst_${mes}`)?.value) || 0,
                 crecimiento: parseInt(document.getElementById(`meta_crec_${mes}`)?.value) || 0,
                 bajas: parseInt(document.getElementById(`meta_bajas_${mes}`)?.value) || 0,
@@ -723,36 +681,27 @@
         const centro = document.getElementById('centroSelect').value;
         const fecha = document.getElementById('reg-fecha').value;
         if(!centro || !fecha) return;
-        
-        const año = parseInt(fecha.substring(0, 4));
-        const mes = parseInt(fecha.substring(5, 7));
+        const año = parseInt(fecha.substring(0, 4)), mes = parseInt(fecha.substring(5, 7));
         await cargarMetasMensuales();
         const meta = getMetaMensual(centro, año, mes);
-        
         document.getElementById('m-inst').value = meta.inst;
         document.getElementById('m-crec').value = meta.crecimiento;
         document.getElementById('m-bajas').value = meta.bajas;
         document.getElementById('m-perd').value = meta.perdidos;
     }
     
-    // CRUD Firebase
     async function cargarDesdeFirebase() {
         showLoading();
         try {
             const q = query(collection(db, "kpi_dashboard_multi"), orderBy("fecha", "desc"));
             const querySnapshot = await getDocs(q);
             dbData = [];
-            querySnapshot.forEach((doc) => {
-                dbData.push({ id: doc.id, ...doc.data() });
-            });
+            querySnapshot.forEach((doc) => dbData.push({ id: doc.id, ...doc.data() }));
             renderTable();
-            if(document.getElementById('unidad').classList.contains('active')) {
-                actualizarUNCaracas();
-            }
+            if(document.getElementById('unidad').classList.contains('active')) actualizarUNCaracas();
             hideLoading();
             return dbData;
         } catch (error) {
-            console.error("Error cargando datos:", error);
             alert("Error al cargar datos: " + error.message);
             hideLoading();
             return [];
@@ -762,27 +711,18 @@
     async function guardarEnFirebase() {
         const centro = document.getElementById('centroSelect').value;
         const fecha = document.getElementById('reg-fecha').value;
-        
-        if(!centro) return alert("Por favor selecciona un Centro de Operaciones.");
-        if(!fecha) return alert("Por favor selecciona una fecha.");
-        
-        const año = parseInt(fecha.substring(0, 4));
-        const mes = parseInt(fecha.substring(5, 7));
+        if(!centro) return alert("Selecciona un Centro");
+        if(!fecha) return alert("Selecciona una fecha");
+        const año = parseInt(fecha.substring(0, 4)), mes = parseInt(fecha.substring(5, 7));
         await cargarMetasMensuales();
         const meta = getMetaMensual(centro, año, mes);
-        
         const row = {
-            centro: centro, fecha: fecha,
-            inst: Number(document.getElementById('r-inst').value || 0),
-            obj_inst: meta.inst,
-            crecimiento: Number(document.getElementById('r-crec').value || 0),
-            obj_crecimiento: meta.crecimiento,
-            bajas: Number(document.getElementById('r-bajas').value || 0),
-            obj_bajas: meta.bajas,
-            perdidos: Number(document.getElementById('r-perd').value || 0),
-            obj_perdidos: meta.perdidos
+            centro, fecha,
+            inst: Number(document.getElementById('r-inst').value || 0), obj_inst: meta.inst,
+            crecimiento: Number(document.getElementById('r-crec').value || 0), obj_crecimiento: meta.crecimiento,
+            bajas: Number(document.getElementById('r-bajas').value || 0), obj_bajas: meta.bajas,
+            perdidos: Number(document.getElementById('r-perd').value || 0), obj_perdidos: meta.perdidos
         };
-        
         showLoading();
         try {
             const q = query(collection(db, "kpi_dashboard_multi"));
@@ -792,14 +732,9 @@
                 const data = doc.data();
                 if(data.fecha === fecha && data.centro === centro) existingDoc = { id: doc.id, ...data };
             });
-            
-            if(existingDoc) {
-                await updateDoc(doc(db, "kpi_dashboard_multi", existingDoc.id), row);
-                alert("¡Registro actualizado!");
-            } else {
-                await addDoc(collection(db, "kpi_dashboard_multi"), row);
-                alert("¡Registro guardado!");
-            }
+            if(existingDoc) await updateDoc(doc(db, "kpi_dashboard_multi", existingDoc.id), row);
+            else await addDoc(collection(db, "kpi_dashboard_multi"), row);
+            alert("Registro guardado/actualizado");
             await cargarDesdeFirebase();
             document.getElementById('r-inst').value = '';
             document.getElementById('r-crec').value = '';
@@ -807,7 +742,6 @@
             document.getElementById('r-perd').value = '';
             hideLoading();
         } catch (error) {
-            console.error("Error guardando:", error);
             alert("Error al guardar: " + error.message);
             hideLoading();
         }
@@ -821,11 +755,7 @@
                 alert("Registro eliminado");
                 await cargarDesdeFirebase();
                 hideLoading();
-            } catch (error) {
-                console.error("Error eliminando:", error);
-                alert("Error al eliminar: " + error.message);
-                hideLoading();
-            }
+            } catch (error) { alert("Error: " + error.message); hideLoading(); }
         }
     }
     
@@ -843,10 +773,8 @@
     function renderTable() {
         const filtroCentro = document.getElementById('filtroCentro').value;
         let datosFiltrados = filtroCentro !== 'todos' && filtroCentro ? dbData.filter(d => d.centro === filtroCentro) : dbData;
-        
         const tbody = document.getElementById('cuerpo-tabla');
         document.getElementById('contador-filas').innerHTML = `${datosFiltrados.length} Registros`;
-        
         tbody.innerHTML = datosFiltrados.map(d => `
             <tr>
                 <td><strong>${d.centro}</strong></td>
@@ -859,29 +787,21 @@
                 <button class="delete-btn" data-id="${d.id}">🗑️ Eliminar</button></td>
             </tr>
         `).join('');
-        
-        document.querySelectorAll('.edit-btn').forEach(btn => {
-            btn.addEventListener('click', () => editarRegistro(JSON.parse(btn.getAttribute('data-registro'))));
-        });
-        document.querySelectorAll('.delete-btn').forEach(btn => {
-            btn.addEventListener('click', () => eliminarRegistro(btn.getAttribute('data-id')));
-        });
+        document.querySelectorAll('.edit-btn').forEach(btn => btn.addEventListener('click', () => editarRegistro(JSON.parse(btn.getAttribute('data-registro')))));
+        document.querySelectorAll('.delete-btn').forEach(btn => btn.addEventListener('click', () => eliminarRegistro(btn.getAttribute('data-id'))));
     }
     
-    // Importar Excel
     document.getElementById('excel-file').addEventListener('change', function(e) {
         const reader = new FileReader();
         reader.onload = async (e) => {
             showLoading();
             const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
             let nuevos = 0;
-            
             for(const sheetName of workbook.SheetNames) {
                 if(sheetName === 'PRINCIPAL' || sheetName === 'CONSOLIDADO') continue;
                 const json = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
                 const centro = sheetName;
                 if(!centros.includes(centro)) centros.push(centro);
-                
                 for(const r of json) {
                     let f = r['Fecha'] instanceof Date ? r['Fecha'].toISOString().split('T')[0] : r['Fecha'];
                     if(!f) continue;
@@ -913,9 +833,7 @@
     async function exportarExcel() {
         const consolidado = {};
         dbData.forEach(item => {
-            if(!consolidado[item.fecha]) {
-                consolidado[item.fecha] = { fecha: item.fecha, inst: 0, obj_inst: 0, crecimiento: 0, obj_crecimiento: 0, bajas: 0, obj_bajas: 0, perdidos: 0, obj_perdidos: 0 };
-            }
+            if(!consolidado[item.fecha]) consolidado[item.fecha] = { fecha: item.fecha, inst: 0, obj_inst: 0, crecimiento: 0, obj_crecimiento: 0, bajas: 0, obj_bajas: 0, perdidos: 0, obj_perdidos: 0 };
             consolidado[item.fecha].inst += item.inst;
             consolidado[item.fecha].obj_inst += item.obj_inst;
             consolidado[item.fecha].crecimiento += item.crecimiento;
@@ -925,7 +843,6 @@
             consolidado[item.fecha].perdidos += item.perdidos;
             consolidado[item.fecha].obj_perdidos += item.obj_perdidos;
         });
-        
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(Object.values(consolidado).sort((a,b)=>a.fecha.localeCompare(b.fecha))), "CONSOLIDADO");
         for(const centro of centros) {
@@ -935,7 +852,30 @@
         XLSX.writeFile(wb, `KPI_${new Date().toISOString().split('T')[0]}.xlsx`);
     }
     
-    // Comparativa centros
+    // Gráfica con META como línea (NO como barra)
+    function crearGraficaConMetaLinea(ctx, labels, valoresReales, valoresMetas, titulo, colorBarra = '#8b5cf6', colorLinea = '#f59e0b') {
+        return new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Real', data: valoresReales, backgroundColor: colorBarra, borderRadius: 8, order: 2 },
+                    { label: 'Meta', data: valoresMetas, type: 'line', borderColor: colorLinea, backgroundColor: 'transparent', borderWidth: 3, fill: false, tension: 0.1, pointRadius: 6, pointBackgroundColor: colorLinea, pointBorderColor: 'white', pointBorderWidth: 2, order: 1 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    tooltip: { mode: 'index', intersect: false },
+                    legend: { position: 'top' },
+                    title: { display: true, text: titulo, font: { size: 16 } }
+                },
+                scales: { y: { beginAtZero: true, title: { display: true, text: 'Valor' } } }
+            }
+        });
+    }
+    
     function compararCentros() {
         const centroA = document.getElementById('compCentroA').value, fechaA = document.getElementById('compFechaA').value;
         const centroB = document.getElementById('compCentroB').value, fechaB = document.getElementById('compFechaB').value;
@@ -945,24 +885,19 @@
         const registroA = dbData.find(d => d.centro === centroA && d.fecha === fechaA);
         const registroB = dbData.find(d => d.centro === centroB && d.fecha === fechaB);
         
-        const datasets = [];
-        if(registroA) {
-            datasets.push({ label: `${centroA} - ${fechaA} (Real)`, data: [registroA[metrica]], backgroundColor: '#2563eb', borderRadius: 8 });
-            datasets.push({ label: `${centroA} - ${fechaA} (Meta)`, data: [registroA[`obj_${metrica}`]], backgroundColor: '#93c5fd', borderRadius: 8 });
-        } else { datasets.push({ label: `${centroA} - ${fechaA} (Sin datos)`, data: [0], backgroundColor: '#cbd5e1', borderRadius: 8 }); }
-        if(registroB) {
-            datasets.push({ label: `${centroB} - ${fechaB} (Real)`, data: [registroB[metrica]], backgroundColor: '#22c55e', borderRadius: 8 });
-            datasets.push({ label: `${centroB} - ${fechaB} (Meta)`, data: [registroB[`obj_${metrica}`]], backgroundColor: '#86efac', borderRadius: 8 });
-        } else { datasets.push({ label: `${centroB} - ${fechaB} (Sin datos)`, data: [0], backgroundColor: '#cbd5e1', borderRadius: 8 }); }
+        const labels = [`${centroA} - ${fechaA}`, `${centroB} - ${fechaB}`];
+        const valoresReales = [registroA ? registroA[metrica] : 0, registroB ? registroB[metrica] : 0];
+        const valoresMetas = [registroA ? registroA[`obj_${metrica}`] : 0, registroB ? registroB[`obj_${metrica}`] : 0];
         
         if(myChart) myChart.destroy();
-        myChart = new Chart(document.getElementById('graficaComparativa').getContext('2d'), {
-            type: 'bar', data: { labels: ['Comparativa'], datasets },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: `Comparativa: ${labelsMap[metrica]}` } }, scales: { y: { beginAtZero: true } } }
-        });
+        myChart = crearGraficaConMetaLinea(
+            document.getElementById('graficaComparativa').getContext('2d'),
+            labels, valoresReales, valoresMetas,
+            `Comparativa: ${labelsMap[metrica]}`,
+            '#8b5cf6', '#f59e0b'
+        );
     }
     
-    // Análisis por centro
     function getUltimoDiaPorMes(data, centro, año) {
         const meses = {};
         data.filter(d => d.centro === centro && d.fecha.startsWith(año.toString())).forEach(item => {
@@ -1003,19 +938,20 @@
         const valoresMetas = ultimosDias.map(d => d[campoMeta]);
         
         if(analisisChart) analisisChart.destroy();
-        analisisChart = new Chart(document.getElementById('graficaAnalisis').getContext('2d'), {
-            type: 'bar', data: { labels, datasets: [
-                { label: `${titulo} (Real)`, data: valoresReales, backgroundColor: '#2563eb', borderRadius: 8 },
-                { label: `${titulo} (Meta)`, data: valoresMetas, type: 'line', borderColor: '#f59e0b', borderWidth: 3, fill: false, pointRadius: 5 }
-            ] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: `${centro} - ${titulo} ${añoFiltro}` } }, scales: { y: { beginAtZero: true } } }
-        });
+        analisisChart = crearGraficaConMetaLinea(
+            document.getElementById('graficaAnalisis').getContext('2d'),
+            labels, valoresReales, valoresMetas,
+            `${centro} - ${titulo} ${añoFiltro}`,
+            '#2563eb', '#f59e0b'
+        );
     }
     
-    // UN Caracas
-    function getConsolidadoPorDia(data) {
+    function getConsolidadoPorDia(data, centroFiltro = 'todos') {
         const porDia = {};
-        data.forEach(item => {
+        let datos = data;
+        if(centroFiltro !== 'todos') datos = data.filter(d => d.centro === centroFiltro);
+        
+        datos.forEach(item => {
             if(!porDia[item.fecha]) porDia[item.fecha] = { fecha: item.fecha, inst: 0, obj_inst: 0, crecimiento: 0, obj_crecimiento: 0, bajas: 0, obj_bajas: 0, perdidos: 0, obj_perdidos: 0 };
             porDia[item.fecha].inst += item.inst;
             porDia[item.fecha].obj_inst += item.obj_inst;
@@ -1039,43 +975,31 @@
     async function actualizarUNCaracas() {
         if(dbData.length === 0) return;
         
+        const centroFiltro = document.getElementById('unCentroFiltro').value;
         const metrica = document.getElementById('unMetrica').value;
         const tipoVista = document.getElementById('unTipoVista').value;
         const metricaLabels = { 'inst': 'Instalaciones', 'crecimiento': 'Crecimiento', 'bajas': 'Bajas', 'perdidos': 'Clientes Perdidos' };
         
         await cargarMetasMensuales();
-        const consolidado = getConsolidadoPorDia(dbData);
+        const consolidado = getConsolidadoPorDia(dbData, centroFiltro);
         
         let datosFiltrados = [];
-        let tituloGrafica = '';
+        let tituloGrafica = centroFiltro !== 'todos' ? `${centroFiltro} - ` : 'UN Caracas - ';
         
         if(tipoVista === 'dia') {
             const dia = document.getElementById('unDia').value;
-            if(dia) {
-                datosFiltrados = consolidado.filter(d => d.fecha === dia);
-                tituloGrafica = `Día: ${dia}`;
-            }
+            if(dia) { datosFiltrados = consolidado.filter(d => d.fecha === dia); tituloGrafica += `Día: ${dia}`; }
         } else if(tipoVista === 'mes') {
             const mes = document.getElementById('unMes').value;
-            if(mes) {
-                datosFiltrados = consolidado.filter(d => d.fecha.startsWith(mes));
-                tituloGrafica = `Mes: ${mes}`;
-            }
+            if(mes) { datosFiltrados = consolidado.filter(d => d.fecha.startsWith(mes)); tituloGrafica += `Mes: ${mes}`; }
         } else if(tipoVista === 'rango') {
-            const desde = document.getElementById('unFechaDesde').value;
-            const hasta = document.getElementById('unFechaHasta').value;
-            if(desde && hasta) {
-                datosFiltrados = consolidado.filter(d => d.fecha >= desde && d.fecha <= hasta);
-                tituloGrafica = `Rango: ${desde} al ${hasta}`;
-            }
+            const desde = document.getElementById('unFechaDesde').value, hasta = document.getElementById('unFechaHasta').value;
+            if(desde && hasta) { datosFiltrados = consolidado.filter(d => d.fecha >= desde && d.fecha <= hasta); tituloGrafica += `Rango: ${desde} al ${hasta}`; }
         } else {
             const porMes = {};
-            consolidado.forEach(dia => {
-                const mes = dia.fecha.substring(0, 7);
-                if(!porMes[mes] || dia.fecha > porMes[mes].fecha) porMes[mes] = dia;
-            });
+            consolidado.forEach(dia => { const mes = dia.fecha.substring(0, 7); if(!porMes[mes] || dia.fecha > porMes[mes].fecha) porMes[mes] = dia; });
             datosFiltrados = Object.values(porMes).sort((a,b) => a.fecha.localeCompare(b.fecha));
-            tituloGrafica = 'Agrupado por mes (último día)';
+            tituloGrafica += 'Agrupado por mes (último día)';
         }
         
         if(datosFiltrados.length === 0) {
@@ -1087,24 +1011,14 @@
             return;
         }
         
-        // Calcular totales para cada métrica individualmente (CORREGIDO)
-        let totalInst = 0, totalMetaInst = 0;
-        let totalCrec = 0, totalMetaCrec = 0;
-        let totalBajas = 0, totalMetaBajas = 0;
-        let totalPerdidos = 0, totalMetaPerdidos = 0;
-        
+        let totalInst = 0, totalMetaInst = 0, totalCrec = 0, totalMetaCrec = 0, totalBajas = 0, totalMetaBajas = 0, totalPerdidos = 0, totalMetaPerdidos = 0;
         datosFiltrados.forEach(d => {
-            totalInst += d.inst;
-            totalMetaInst += d.obj_inst;
-            totalCrec += d.crecimiento;
-            totalMetaCrec += d.obj_crecimiento;
-            totalBajas += d.bajas;
-            totalMetaBajas += d.obj_bajas;
-            totalPerdidos += d.perdidos;
-            totalMetaPerdidos += d.obj_perdidos;
+            totalInst += d.inst; totalMetaInst += d.obj_inst;
+            totalCrec += d.crecimiento; totalMetaCrec += d.obj_crecimiento;
+            totalBajas += d.bajas; totalMetaBajas += d.obj_bajas;
+            totalPerdidos += d.perdidos; totalMetaPerdidos += d.obj_perdidos;
         });
         
-        // Actualizar valores en las tarjetas KPI
         document.getElementById('unInstalaciones').textContent = totalInst;
         document.getElementById('unInstalacionesMeta').textContent = `Meta: ${totalMetaInst}`;
         document.getElementById('unCrecimiento').textContent = totalCrec;
@@ -1114,33 +1028,27 @@
         document.getElementById('unPerdidos').textContent = totalPerdidos;
         document.getElementById('unPerdidosMeta').textContent = `Meta: ${totalMetaPerdidos}`;
         
-        // Actualizar colores de las tarjetas según la métrica específica
         updateKPICardColor('cardInstalaciones', totalInst, totalMetaInst, 'inst');
         updateKPICardColor('cardCrecimiento', totalCrec, totalMetaCrec, 'crecimiento');
         updateKPICardColor('cardBajas', totalBajas, totalMetaBajas, 'bajas');
         updateKPICardColor('cardPerdidos', totalPerdidos, totalMetaPerdidos, 'perdidos');
         
-        // Gráfica con la métrica seleccionada
+        let labels = datosFiltrados.map(d => d.fecha);
         let valoresReales = datosFiltrados.map(d => d[metrica]);
         let valoresMetas = datosFiltrados.map(d => d[`obj_${metrica}`]);
-        let labels = datosFiltrados.map(d => d.fecha);
         
-        if(tipoVista === 'mes' && datosFiltrados.length > 0) {
-            labels = datosFiltrados.map(d => d.fecha.split('-')[2]);
-        }
+        if(tipoVista === 'mes' && datosFiltrados.length > 0) labels = datosFiltrados.map(d => d.fecha.split('-')[2]);
         
         if(unChart) unChart.destroy();
-        unChart = new Chart(document.getElementById('graficaUN').getContext('2d'), {
-            type: 'bar',
-            data: { labels, datasets: [
-                { label: `${metricaLabels[metrica]} (Real)`, data: valoresReales, backgroundColor: '#8b5cf6', borderRadius: 8 },
-                { label: `${metricaLabels[metrica]} (Meta)`, data: valoresMetas, type: 'line', borderColor: '#c4b5fd', borderWidth: 3, fill: false, pointRadius: 5 }
-            ] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: `UN Caracas - ${metricaLabels[metrica]} - ${tituloGrafica}` } }, scales: { y: { beginAtZero: true } } }
-        });
+        unChart = crearGraficaConMetaLinea(
+            document.getElementById('graficaUN').getContext('2d'),
+            labels, valoresReales, valoresMetas,
+            `${tituloGrafica} - ${metricaLabels[metrica]}`,
+            '#8b5cf6', '#c4b5fd'
+        );
     }
     
-    // Multi-día
+    // Multi-día con META como línea
     function agregarMultiDay() {
         if(multiDayCount >= 12) { alert("Máximo 12 días"); return; }
         multiDayCount++;
@@ -1152,7 +1060,6 @@
         newDay.querySelector('.remove-day').addEventListener('click', () => {
             newDay.remove();
             multiDayCount--;
-            // Renumerar
             const items = document.querySelectorAll('#multiDaysList .day-item');
             items.forEach((item, idx) => {
                 const input = item.querySelector('input');
@@ -1168,10 +1075,7 @@
         const centro = document.getElementById('multiCentro').value;
         const metrica = document.getElementById('multiMetrica').value;
         const fechas = [];
-        for(let i = 1; i <= multiDayCount; i++) {
-            const f = document.getElementById(`multiDay${i}`)?.value;
-            if(f) fechas.push(f);
-        }
+        for(let i = 1; i <= multiDayCount; i++) { const f = document.getElementById(`multiDay${i}`)?.value; if(f) fechas.push(f); }
         if(fechas.length === 0) { alert("Selecciona al menos una fecha"); return; }
         
         const labelsMap = { 'inst': 'Instalaciones', 'crecimiento': 'Crecimiento', 'bajas': 'Bajas', 'perdidos': 'Clientes Perdidos' };
@@ -1185,7 +1089,7 @@
                 valoresMetas.push(reg ? reg[`obj_${metrica}`] : 0);
             });
         } else {
-            const consolidado = getConsolidadoPorDia(dbData);
+            const consolidado = getConsolidadoPorDia(dbData, 'todos');
             fechas.forEach(fecha => {
                 const reg = consolidado.find(d => d.fecha === fecha);
                 valoresReales.push(reg ? reg[metrica] : 0);
@@ -1194,13 +1098,12 @@
         }
         
         if(multiChart) multiChart.destroy();
-        multiChart = new Chart(document.getElementById('graficaMultiDias').getContext('2d'), {
-            type: 'bar', data: { labels: fechas, datasets: [
-                { label: `${labelsMap[metrica]} (Real)`, data: valoresReales, backgroundColor: '#8b5cf6', borderRadius: 8 },
-                { label: `${labelsMap[metrica]} (Meta)`, data: valoresMetas, type: 'line', borderColor: '#c4b5fd', borderWidth: 3, fill: false, pointRadius: 5 }
-            ] },
-            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
-        });
+        multiChart = crearGraficaConMetaLinea(
+            document.getElementById('graficaMultiDias').getContext('2d'),
+            fechas, valoresReales, valoresMetas,
+            tipo === 'centro' ? `${centro} - ${labelsMap[metrica]}` : `UN Caracas - ${labelsMap[metrica]}`,
+            '#8b5cf6', '#f59e0b'
+        );
     }
     
     function openTab(tabId) {
@@ -1228,6 +1131,7 @@
     document.getElementById('btnActualizarUN')?.addEventListener('click', actualizarUNCaracas);
     document.getElementById('unTipoVista')?.addEventListener('change', toggleUNVista);
     document.getElementById('unMetrica')?.addEventListener('change', actualizarUNCaracas);
+    document.getElementById('unCentroFiltro')?.addEventListener('change', actualizarUNCaracas);
     document.getElementById('unDia')?.addEventListener('change', actualizarUNCaracas);
     document.getElementById('unMes')?.addEventListener('change', actualizarUNCaracas);
     document.getElementById('unFechaDesde')?.addEventListener('change', actualizarUNCaracas);
@@ -1241,8 +1145,8 @@
             actualizarSelectoresCentro();
             document.getElementById('nuevoCentro').value = '';
             alert(`Centro "${nuevo}" agregado`);
-        } else if(centros.includes(nuevo)) { alert('El centro ya existe'); }
-        else { alert('Ingrese un nombre válido'); }
+        } else if(centros.includes(nuevo)) alert('El centro ya existe');
+        else alert('Ingrese un nombre válido');
     });
     
     document.getElementById('filtroCentro')?.addEventListener('change', renderTable);
@@ -1267,10 +1171,7 @@
     cargarMetasMensuales();
     
     const checkAuth = setInterval(() => {
-        if(window.db) {
-            clearInterval(checkAuth);
-            cargarDesdeFirebase();
-        }
+        if(window.db) { clearInterval(checkAuth); cargarDesdeFirebase(); }
     }, 500);
 </script>
 </body>
