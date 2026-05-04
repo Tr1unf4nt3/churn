@@ -249,7 +249,7 @@
                         </tr>
                     </thead>
                     <tbody id="metaTableBody">
-                        <tr><td colspan="6" style="text-align: center;">Selecciona un año para cargar las metas de UN Caracas</td</tr>
+                        <tr><td colspan="6" style="text-align: center;">Selecciona un año para cargar las metas de UN Caracas</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -567,7 +567,7 @@
             const mesNum = i + 1;
             const meta = getMetaUN(parseInt(año), mesNum);
             const row = tbody.insertRow();
-            row.innerHTML = `<td><strong>${meses[i]}</strong></td><td><input type="number" id="meta_inst_${mesNum}" value="${meta.inst}"></td><td><input type="number" id="meta_crec_${mesNum}" value="${meta.crecimiento}"></td><td><input type="number" id="meta_bajas_${mesNum}" value="${meta.bajas}"></td><td><input type="number" id="meta_perd_${mesNum}" value="${meta.perdidos}"></td><td><button class="edit-meta-btn" data-mes="${mesNum}">✏️ Guardar Mes</button></tr>`;
+            row.innerHTML = `<td><strong>${meses[i]}</strong></td><td><input type="number" id="meta_inst_${mesNum}" value="${meta.inst}"></td><td><input type="number" id="meta_crec_${mesNum}" value="${meta.crecimiento}"></td><td><input type="number" id="meta_bajas_${mesNum}" value="${meta.bajas}"></td><td><input type="number" id="meta_perd_${mesNum}" value="${meta.perdidos}"></td><td><button class="edit-meta-btn" data-mes="${mesNum}">✏️ Guardar Mes</button></td>`;
         }
         document.querySelectorAll('.edit-meta-btn').forEach(btn => btn.addEventListener('click', async () => {
             const mes = parseInt(btn.getAttribute('data-mes'));
@@ -940,7 +940,7 @@
         });
     }
     
-    // UN CARACAS - CORREGIDO
+    // UN CARACAS - CORREGIDO (versión que funciona correctamente con centros específicos)
     async function actualizarUNCaracas() {
         if(dbData.length === 0) return;
         
@@ -984,7 +984,9 @@
             if(mes) {
                 const año = parseInt(mes.substring(0,4));
                 const mesNum = parseInt(mes.substring(5,7));
+                
                 if(centroFiltro === 'todos') {
+                    // Para UN Caracas: sumar todos los centros
                     const consolidado = getConsolidadoUNPorMes(año);
                     const mesIndex = mesNum - 1;
                     if(consolidado[mesIndex]) {
@@ -994,15 +996,27 @@
                         valores.perdidos = consolidado[mesIndex].perdidos;
                     }
                 } else {
-                    const ultimosPorMes = getUltimoPorMes(dbData, centroFiltro, año);
-                    const mesIndex = mesNum - 1;
-                    if(ultimosPorMes[mesIndex]) {
-                        valores.inst = ultimosPorMes[mesIndex].inst;
-                        valores.crecimiento = ultimosPorMes[mesIndex].crecimiento;
-                        valores.bajas = ultimosPorMes[mesIndex].bajas;
-                        valores.perdidos = ultimosPorMes[mesIndex].perdidos;
+                    // Para un centro específico: buscar el registro del mes seleccionado
+                    // Obtener todos los registros del centro en ese mes
+                    const registrosDelMes = dbData.filter(d => {
+                        if(d.centro !== centroFiltro) return false;
+                        const fechaRegistro = d.fecha;
+                        const añoRegistro = parseInt(fechaRegistro.substring(0,4));
+                        const mesRegistro = parseInt(fechaRegistro.substring(5,7));
+                        return añoRegistro === año && mesRegistro === mesNum;
+                    });
+                    
+                    if(registrosDelMes.length > 0) {
+                        // Ordenar por fecha y tomar el último registro del mes
+                        registrosDelMes.sort((a, b) => a.fecha.localeCompare(b.fecha));
+                        const ultimoRegistro = registrosDelMes[registrosDelMes.length - 1];
+                        valores.inst = ultimoRegistro.inst;
+                        valores.crecimiento = ultimoRegistro.crecimiento;
+                        valores.bajas = ultimoRegistro.bajas;
+                        valores.perdidos = ultimoRegistro.perdidos;
                     }
                 }
+                
                 const meta = getMetaUN(año, mesNum);
                 metas = meta;
                 labels = [mes];
@@ -1074,17 +1088,55 @@
         // Crear gráfica con la métrica seleccionada
         if(unChart) unChart.destroy();
         if(labels.length > 0 && valoresReales.length > 0) {
-            unChart = new Chart(document.getElementById('graficaUN').getContext('2d'), {
-                type: 'bar',
-                data: { 
-                    labels: labels, 
-                    datasets: [
-                        { label: `${metricaLabels[metricaGrafica]} (Real)`, data: valoresReales, backgroundColor: '#8b5cf6', borderRadius: 8, order: 2 },
-                        { label: `Meta UN`, data: valoresMetas, type: 'line', borderColor: '#f59e0b', borderWidth: 3, fill: false, pointRadius: 6, pointBackgroundColor: '#f59e0b', pointBorderColor: 'white', pointBorderWidth: 2, order: 1 }
-                    ] 
-                },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: `${tituloGrafica} - ${metricaLabels[metricaGrafica]}` } }, scales: { y: { beginAtZero: true } } }
-            });
+            const canvas = document.getElementById('graficaUN');
+            if(canvas) {
+                const ctx = canvas.getContext('2d');
+                unChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: { 
+                        labels: labels, 
+                        datasets: [
+                            { 
+                                label: `${metricaLabels[metricaGrafica]} (Real)`, 
+                                data: valoresReales, 
+                                backgroundColor: '#8b5cf6', 
+                                borderRadius: 8, 
+                                order: 2 
+                            },
+                            { 
+                                label: `Meta UN`, 
+                                data: valoresMetas, 
+                                type: 'line', 
+                                borderColor: '#f59e0b', 
+                                borderWidth: 3, 
+                                fill: false, 
+                                pointRadius: 6, 
+                                pointBackgroundColor: '#f59e0b', 
+                                pointBorderColor: 'white', 
+                                pointBorderWidth: 2, 
+                                order: 1 
+                            }
+                        ] 
+                    },
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false, 
+                        plugins: { 
+                            title: { 
+                                display: true, 
+                                text: `${tituloGrafica} - ${metricaLabels[metricaGrafica]}`,
+                                font: { size: 14 }
+                            } 
+                        }, 
+                        scales: { 
+                            y: { 
+                                beginAtZero: true,
+                                title: { display: true, text: metricaLabels[metricaGrafica] }
+                            } 
+                        } 
+                    }
+                });
+            }
         }
     }
     
