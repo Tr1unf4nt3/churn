@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KPI Dashboard Pro - v24.0 (UN Caracas Completo)</title>
+    <title>KPI Dashboard Pro - v25.0 (Correcciones Finales)</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
@@ -332,7 +332,7 @@
         </div>
     </div>
 
-    <!-- Pestaña Análisis por Centro -->
+    <!-- Pestaña Análisis por Centro (CORREGIDA - muestra meta) -->
     <div id="analisis" class="content">
         <div class="metric-buttons" id="metricButtons">
             <button class="metric-btn active" data-metrica="instalaciones">🏗️ Instalaciones</button>
@@ -366,7 +366,7 @@
         </div>
     </div>
 
-    <!-- Pestaña UN Caracas (MEJORADA) -->
+    <!-- Pestaña UN Caracas (CORREGIDA) -->
     <div id="unidad" class="content">
         <div style="background: linear-gradient(135deg, var(--un-color) 0%, #7c3aed 100%); padding: 30px; border-radius: 12px; margin-bottom: 30px; text-align: center; color: white;">
             <h2 style="margin: 0; font-size: 28px;">⭐ UN Caracas</h2>
@@ -378,6 +378,15 @@
                 <label>🏢 Centro:</label>
                 <select id="unCentroFiltro">
                     <option value="todos">Todos los centros (UN Caracas)</option>
+                </select>
+            </div>
+            <div class="un-filter-item">
+                <label>📊 Métrica para gráfica:</label>
+                <select id="unMetricaGrafica">
+                    <option value="inst">Instalaciones</option>
+                    <option value="crecimiento">Crecimiento</option>
+                    <option value="bajas">Bajas Rezagadas Canceladas</option>
+                    <option value="perdidos">Clientes Perdidos</option>
                 </select>
             </div>
             <div class="un-filter-item">
@@ -842,6 +851,7 @@
         actualizarGraficaAnalisis();
     }
     
+    // ANÁLISIS POR CENTRO - CORREGIDO con meta
     function actualizarGraficaAnalisis() {
         if(dbData.length === 0) return;
         
@@ -849,29 +859,42 @@
         const agrupacion = document.getElementById('agrupacion').value;
         const año = parseInt(document.getElementById('añoFiltroAnalisis').value);
         
-        let campoReal, titulo;
+        let campoReal, campoMeta, titulo;
         switch(metricaActual) {
-            case 'instalaciones': campoReal = 'inst'; titulo = 'Instalaciones'; break;
-            case 'crecimiento': campoReal = 'crecimiento'; titulo = 'Crecimiento'; break;
-            case 'bajas': campoReal = 'bajas'; titulo = 'Bajas Rezagadas Canceladas'; break;
-            default: campoReal = 'perdidos'; titulo = 'Clientes Perdidos';
+            case 'instalaciones': campoReal = 'inst'; campoMeta = 'obj_inst'; titulo = 'Instalaciones'; break;
+            case 'crecimiento': campoReal = 'crecimiento'; campoMeta = 'obj_crecimiento'; titulo = 'Crecimiento'; break;
+            case 'bajas': campoReal = 'bajas'; campoMeta = 'obj_bajas'; titulo = 'Bajas Rezagadas Canceladas'; break;
+            default: campoReal = 'perdidos'; campoMeta = 'obj_perdidos'; titulo = 'Clientes Perdidos';
         }
         
         let labels = [];
         let valoresReales = [];
+        let valoresMetas = [];
         
         if(centroSeleccionado === 'todos') {
             if(agrupacion === 'mes') {
                 const consolidado = getConsolidadoUNPorMes(año);
                 labels = meses;
                 valoresReales = consolidado.map(m => m[campoReal]);
+                // Para UN Caracas, las metas vienen de la tabla de metas UN
+                for(let i = 0; i < 12; i++) {
+                    const meta = getMetaUN(año, i + 1);
+                    valoresMetas.push(meta[campoReal]);
+                }
             } else {
                 const añosDisponibles = getAñosDisponibles();
                 labels = añosDisponibles;
                 for(const añoActual of añosDisponibles) {
                     const consolidado = getConsolidadoUNPorMes(añoActual);
-                    const sumaAnual = consolidado.reduce((sum, m) => sum + m[campoReal], 0);
-                    valoresReales.push(sumaAnual);
+                    const sumaReal = consolidado.reduce((sum, m) => sum + m[campoReal], 0);
+                    valoresReales.push(sumaReal);
+                    // Suma de metas del año
+                    let sumaMeta = 0;
+                    for(let i = 0; i < 12; i++) {
+                        const meta = getMetaUN(parseInt(añoActual), i + 1);
+                        sumaMeta += meta[campoReal];
+                    }
+                    valoresMetas.push(sumaMeta);
                 }
             }
         } else {
@@ -883,6 +906,8 @@
                     return fecha.toLocaleDateString('es-ES', { month: 'long', day: 'numeric' });
                 });
                 valoresReales = ultimosPorMes.map(d => d[campoReal]);
+                // Para centros individuales, las metas son 0 (no tienen metas propias)
+                valoresMetas = ultimosPorMes.map(() => 0);
             } else {
                 const añosDisponibles = getAñosDisponibles();
                 labels = añosDisponibles;
@@ -890,6 +915,7 @@
                     const ultimosPorMes = getUltimoPorMes(dbData, centroSeleccionado, añoActual);
                     const sumaAnual = ultimosPorMes.reduce((sum, m) => sum + m[campoReal], 0);
                     valoresReales.push(sumaAnual);
+                    valoresMetas.push(0);
                 }
             }
         }
@@ -901,18 +927,28 @@
         if(agrupacion === 'mes') subtitulo += ` ${año}`;
         else subtitulo += ' (todos los años)';
         
+        // Mostrar siempre la línea de meta si hay valores de meta
+        const datasets = [{ label: 'Real', data: valoresReales, backgroundColor: '#2563eb', borderRadius: 8, order: 2 }];
+        if(valoresMetas.some(v => v > 0)) {
+            datasets.push({ label: 'Meta', data: valoresMetas, type: 'line', borderColor: '#f59e0b', borderWidth: 3, fill: false, tension: 0.1, pointRadius: 6, pointBackgroundColor: '#f59e0b', pointBorderColor: 'white', pointBorderWidth: 2, order: 1 });
+        }
+        
         analisisChart = new Chart(ctx, {
             type: 'bar',
-            data: { labels, datasets: [{ label: 'Real', data: valoresReales, backgroundColor: '#2563eb', borderRadius: 8 }] },
+            data: { labels, datasets },
             options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: subtitulo, font: { size: 16 } } }, scales: { y: { beginAtZero: true, title: { display: true, text: titulo } } } }
         });
     }
     
+    // UN CARACAS - CORREGIDO
     async function actualizarUNCaracas() {
         if(dbData.length === 0) return;
         
         const centroFiltro = document.getElementById('unCentroFiltro').value;
+        const metricaGrafica = document.getElementById('unMetricaGrafica').value;
         const tipoVista = document.getElementById('unTipoVista').value;
+        
+        const metricaLabels = { 'inst':'Instalaciones', 'crecimiento':'Crecimiento', 'bajas':'Bajas Rezagadas Canceladas', 'perdidos':'Clientes Perdidos' };
         
         await cargarMetasUN();
         
@@ -929,24 +965,18 @@
                 if(centroFiltro === 'todos') {
                     const suma = getSumaUN(dia);
                     valores = suma;
-                    const año = parseInt(dia.substring(0,4)), mes = parseInt(dia.substring(5,7));
-                    const meta = getMetaUN(año, mes);
-                    metas = meta;
-                    labels = [dia];
-                    valoresReales = [suma.inst, suma.crecimiento, suma.bajas, suma.perdidos];
-                    valoresMetas = [meta.inst, meta.crecimiento, meta.bajas, meta.perdidos];
                 } else {
                     valores.inst = getValorCentro(centroFiltro, dia, 'inst');
                     valores.crecimiento = getValorCentro(centroFiltro, dia, 'crecimiento');
                     valores.bajas = getValorCentro(centroFiltro, dia, 'bajas');
                     valores.perdidos = getValorCentro(centroFiltro, dia, 'perdidos');
-                    const año = parseInt(dia.substring(0,4)), mes = parseInt(dia.substring(5,7));
-                    const meta = getMetaUN(año, mes);
-                    metas = meta;
-                    labels = [dia];
-                    valoresReales = [valores.inst, valores.crecimiento, valores.bajas, valores.perdidos];
-                    valoresMetas = [meta.inst, meta.crecimiento, meta.bajas, meta.perdidos];
                 }
+                const año = parseInt(dia.substring(0,4)), mes = parseInt(dia.substring(5,7));
+                const meta = getMetaUN(año, mes);
+                metas = meta;
+                labels = [dia];
+                valoresReales = [valores[metricaGrafica]];
+                valoresMetas = [meta[metricaGrafica]];
                 tituloGrafica += `Día: ${dia}`;
             }
         } else if(tipoVista === 'mes') {
@@ -963,11 +993,6 @@
                         valores.bajas = consolidado[mesIndex].bajas;
                         valores.perdidos = consolidado[mesIndex].perdidos;
                     }
-                    const meta = getMetaUN(año, mesNum);
-                    metas = meta;
-                    labels = [mes];
-                    valoresReales = [valores.inst, valores.crecimiento, valores.bajas, valores.perdidos];
-                    valoresMetas = [meta.inst, meta.crecimiento, meta.bajas, meta.perdidos];
                 } else {
                     const ultimosPorMes = getUltimoPorMes(dbData, centroFiltro, año);
                     const mesIndex = mesNum - 1;
@@ -977,12 +1002,12 @@
                         valores.bajas = ultimosPorMes[mesIndex].bajas;
                         valores.perdidos = ultimosPorMes[mesIndex].perdidos;
                     }
-                    const meta = getMetaUN(año, mesNum);
-                    metas = meta;
-                    labels = [mes];
-                    valoresReales = [valores.inst, valores.crecimiento, valores.bajas, valores.perdidos];
-                    valoresMetas = [meta.inst, meta.crecimiento, meta.bajas, meta.perdidos];
                 }
+                const meta = getMetaUN(año, mesNum);
+                metas = meta;
+                labels = [mes];
+                valoresReales = [valores[metricaGrafica]];
+                valoresMetas = [meta[metricaGrafica]];
                 tituloGrafica += `Mes: ${mes}`;
             }
         } else if(tipoVista === 'agrupado') {
@@ -990,11 +1015,11 @@
             if(centroFiltro === 'todos') {
                 const consolidado = getConsolidadoUNPorMes(año);
                 labels = meses;
-                valoresReales = consolidado.map(m => m.inst);
+                valoresReales = consolidado.map(m => m[metricaGrafica]);
                 valoresMetas = [];
                 for(let i = 0; i < 12; i++) {
                     const meta = getMetaUN(año, i + 1);
-                    valoresMetas.push(meta.inst);
+                    valoresMetas.push(meta[metricaGrafica]);
                 }
                 if(consolidado.length > 0) {
                     const ultimo = consolidado[consolidado.length - 1];
@@ -1003,8 +1028,6 @@
                     valores.bajas = ultimo.bajas;
                     valores.perdidos = ultimo.perdidos;
                 }
-                const ultimaMeta = getMetaUN(año, 12);
-                metas = ultimaMeta;
             } else {
                 const ultimosPorMes = getUltimoPorMes(dbData, centroFiltro, año);
                 labels = meses;
@@ -1012,12 +1035,12 @@
                 valoresMetas = [];
                 for(let i = 0; i < 12; i++) {
                     if(ultimosPorMes[i]) {
-                        valoresReales.push(ultimosPorMes[i].inst);
+                        valoresReales.push(ultimosPorMes[i][metricaGrafica]);
                     } else {
                         valoresReales.push(0);
                     }
                     const meta = getMetaUN(año, i + 1);
-                    valoresMetas.push(meta.inst);
+                    valoresMetas.push(meta[metricaGrafica]);
                 }
                 if(ultimosPorMes.length > 0) {
                     const ultimo = ultimosPorMes[ultimosPorMes.length - 1];
@@ -1026,9 +1049,9 @@
                     valores.bajas = ultimo.bajas;
                     valores.perdidos = ultimo.perdidos;
                 }
-                const ultimaMeta = getMetaUN(año, 12);
-                metas = ultimaMeta;
             }
+            const ultimaMeta = getMetaUN(año, 12);
+            metas = ultimaMeta;
             tituloGrafica += `Agrupado por mes ${año}`;
         }
         
@@ -1048,9 +1071,7 @@
         updateKPICardColor('cardBajas', valores.bajas, metas.bajas, 'bajas');
         updateKPICardColor('cardPerdidos', valores.perdidos, metas.perdidos, 'perdidos');
         
-        // Crear gráfica (mostrando la métrica seleccionada por el filtro de la gráfica)
-        // Para la gráfica, usamos la primera métrica (Instalaciones) como ejemplo,
-        // pero se puede modificar para que el usuario seleccione qué métrica ver en la gráfica
+        // Crear gráfica con la métrica seleccionada
         if(unChart) unChart.destroy();
         if(labels.length > 0 && valoresReales.length > 0) {
             unChart = new Chart(document.getElementById('graficaUN').getContext('2d'), {
@@ -1058,11 +1079,11 @@
                 data: { 
                     labels: labels, 
                     datasets: [
-                        { label: 'Real (Instalaciones)', data: valoresReales, backgroundColor: '#8b5cf6', borderRadius: 8, order: 2 },
-                        { label: 'Meta UN', data: valoresMetas, type: 'line', borderColor: '#f59e0b', borderWidth: 3, fill: false, pointRadius: 6, pointBackgroundColor: '#f59e0b', pointBorderColor: 'white', pointBorderWidth: 2, order: 1 }
+                        { label: `${metricaLabels[metricaGrafica]} (Real)`, data: valoresReales, backgroundColor: '#8b5cf6', borderRadius: 8, order: 2 },
+                        { label: `Meta UN`, data: valoresMetas, type: 'line', borderColor: '#f59e0b', borderWidth: 3, fill: false, pointRadius: 6, pointBackgroundColor: '#f59e0b', pointBorderColor: 'white', pointBorderWidth: 2, order: 1 }
                     ] 
                 },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: `${tituloGrafica} - Instalaciones` } }, scales: { y: { beginAtZero: true } } }
+                options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: `${tituloGrafica} - ${metricaLabels[metricaGrafica]}` } }, scales: { y: { beginAtZero: true } } }
             });
         }
     }
@@ -1071,6 +1092,7 @@
         const tipo = document.getElementById('unTipoVista').value;
         document.getElementById('unDiaContainer').style.display = tipo === 'dia' ? 'flex' : 'none';
         document.getElementById('unMesContainer').style.display = tipo === 'mes' ? 'flex' : 'none';
+        actualizarUNCaracas();
     }
     
     function agregarMultiDay() {
@@ -1133,6 +1155,7 @@
     document.getElementById('btnActualizarUN')?.addEventListener('click', actualizarUNCaracas);
     document.getElementById('unTipoVista')?.addEventListener('change', toggleUNVista);
     document.getElementById('unCentroFiltro')?.addEventListener('change', actualizarUNCaracas);
+    document.getElementById('unMetricaGrafica')?.addEventListener('change', actualizarUNCaracas);
     document.getElementById('unDia')?.addEventListener('change', actualizarUNCaracas);
     document.getElementById('unMes')?.addEventListener('change', actualizarUNCaracas);
     document.getElementById('analisisCentro')?.addEventListener('change', actualizarGraficaAnalisis);
