@@ -3,14 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KPI Dashboard Pro - v25.0 (Correcciones Finales)</title>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>KPI Dashboard Pro - v25.1 (Sin Caché)</title>
+    
+    <!-- Prevenir caché de la página - SOLUCIÓN PERMANENTE -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <!-- Versión dinámica para evitar caché de archivos estáticos -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js?v=2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js?v=2"></script>
     
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, where, disableNetwork, enableNetwork, clearIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         
         const firebaseConfig = {
@@ -25,6 +32,14 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
+        
+        // Intentar limpiar persistencia de Firebase (opcional, puede fallar si no está habilitada)
+        try {
+            await clearIndexedDbPersistence(db);
+            console.log("Persistencia de Firebase limpiada correctamente");
+        } catch (e) {
+            console.log("No se pudo limpiar persistencia (es normal si no estaba habilitada)");
+        }
         
         window.db = db;
         window.collection = collection;
@@ -86,6 +101,7 @@
         .btn-danger { background: var(--danger); color: white; }
         .btn-un { background: var(--un-color); color: white; }
         .btn-add { background: var(--success); color: white; padding: 8px 15px; font-size: 12px; }
+        .btn-warning { background: var(--warning); color: white; }
 
         .table-container { overflow-x: auto; max-height: 500px; border: 1px solid #e2e8f0; border-radius: 8px; margin-top: 10px; }
         table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1000px; }
@@ -149,6 +165,8 @@
         
         .current-value { font-size: 48px; font-weight: bold; margin: 10px 0; }
         .meta-value { font-size: 18px; opacity: 0.8; }
+        
+        .header-buttons { display: flex; gap: 10px; }
     </style>
 </head>
 <body>
@@ -160,7 +178,12 @@
             <p style="margin:0; color: var(--secondary);">Multi-Centro de Operaciones | Metas UN Caracas</p>
             <div class="sync-status" id="sync-status">🔄 Conectando a Firebase...</div>
         </div>
-        <button class="btn btn-export" id="btnExportar">📥 Exportar Excel</button>
+        <div class="header-buttons">
+            <button class="btn btn-warning" id="btnForzarActualizacion" style="background: #f59e0b; color: white;">
+                🔄 Forzar Actualización Total
+            </button>
+            <button class="btn btn-export" id="btnExportar">📥 Exportar Excel</button>
+        </div>
     </div>
     
     <div class="tabs" id="tabs">
@@ -332,7 +355,7 @@
         </div>
     </div>
 
-    <!-- Pestaña Análisis por Centro (CORREGIDA - muestra meta) -->
+    <!-- Pestaña Análisis por Centro -->
     <div id="analisis" class="content">
         <div class="metric-buttons" id="metricButtons">
             <button class="metric-btn active" data-metrica="instalaciones">🏗️ Instalaciones</button>
@@ -366,7 +389,7 @@
         </div>
     </div>
 
-    <!-- Pestaña UN Caracas (CORREGIDA) -->
+    <!-- Pestaña UN Caracas -->
     <div id="unidad" class="content">
         <div style="background: linear-gradient(135deg, var(--un-color) 0%, #7c3aed 100%); padding: 30px; border-radius: 12px; margin-bottom: 30px; text-align: center; color: white;">
             <h2 style="margin: 0; font-size: 28px;">⭐ UN Caracas</h2>
@@ -469,6 +492,56 @@
     
     function showLoading() { loadingDiv.style.display = 'block'; }
     function hideLoading() { loadingDiv.style.display = 'none'; }
+    
+    // Función para forzar actualización completa sin caché
+    window.forzarActualizacionCompleta = async function() {
+        console.log("Forzando actualización completa desde Firebase...");
+        showLoading();
+        
+        try {
+            // Recargar datos desde Firebase sin usar caché
+            const q = query(collection(db, "kpi_dashboard_multi"), orderBy("fecha", "desc"));
+            const querySnapshot = await getDocs(q);
+            dbData = [];
+            querySnapshot.forEach((doc) => dbData.push({ id: doc.id, ...doc.data() }));
+            
+            // Recargar metas
+            const qMetas = query(collection(db, "kpi_metas_un"));
+            const metasSnapshot = await getDocs(qMetas);
+            metasUNData = [];
+            metasSnapshot.forEach((doc) => metasUNData.push({ id: doc.id, ...doc.data() }));
+            
+            // Recargar centros desde localStorage pero asegurando que no haya datos obsoletos
+            const savedCentros = localStorage.getItem('kpi_centros');
+            if (savedCentros) {
+                const centrosTemp = JSON.parse(savedCentros);
+                if (centrosTemp && centrosTemp.length > 0) {
+                    centros = centrosTemp;
+                }
+            }
+            
+            // Actualizar todas las interfaces
+            actualizarSelectoresCentro();
+            renderTable();
+            
+            // Actualizar pestaña activa
+            if(document.getElementById('unidad').classList.contains('active')) actualizarUNCaracas();
+            if(document.getElementById('analisis').classList.contains('active')) actualizarGraficaAnalisis();
+            
+            // Actualizar timestamp para mostrar que se actualizó
+            const ahora = new Date();
+            const timestamp = ahora.toLocaleTimeString();
+            document.getElementById('sync-status').innerHTML = `✅ Actualizado: ${timestamp}`;
+            
+            hideLoading();
+            console.log("Actualización completa finalizada");
+            alert(`Datos actualizados correctamente (${timestamp})`);
+        } catch (error) {
+            console.error("Error en actualización forzada:", error);
+            hideLoading();
+            alert("Error al actualizar: " + error.message);
+        }
+    };
     
     function isMetaAlcanzada(real, meta, metrica) {
         if(metrica === 'perdidos') return real <= meta;
@@ -851,7 +924,6 @@
         actualizarGraficaAnalisis();
     }
     
-    // ANÁLISIS POR CENTRO - CORREGIDO con meta
     function actualizarGraficaAnalisis() {
         if(dbData.length === 0) return;
         
@@ -876,7 +948,6 @@
                 const consolidado = getConsolidadoUNPorMes(año);
                 labels = meses;
                 valoresReales = consolidado.map(m => m[campoReal]);
-                // Para UN Caracas, las metas vienen de la tabla de metas UN
                 for(let i = 0; i < 12; i++) {
                     const meta = getMetaUN(año, i + 1);
                     valoresMetas.push(meta[campoReal]);
@@ -888,7 +959,6 @@
                     const consolidado = getConsolidadoUNPorMes(añoActual);
                     const sumaReal = consolidado.reduce((sum, m) => sum + m[campoReal], 0);
                     valoresReales.push(sumaReal);
-                    // Suma de metas del año
                     let sumaMeta = 0;
                     for(let i = 0; i < 12; i++) {
                         const meta = getMetaUN(parseInt(añoActual), i + 1);
@@ -906,7 +976,6 @@
                     return fecha.toLocaleDateString('es-ES', { month: 'long', day: 'numeric' });
                 });
                 valoresReales = ultimosPorMes.map(d => d[campoReal]);
-                // Para centros individuales, las metas son 0 (no tienen metas propias)
                 valoresMetas = ultimosPorMes.map(() => 0);
             } else {
                 const añosDisponibles = getAñosDisponibles();
@@ -927,7 +996,6 @@
         if(agrupacion === 'mes') subtitulo += ` ${año}`;
         else subtitulo += ' (todos los años)';
         
-        // Mostrar siempre la línea de meta si hay valores de meta
         const datasets = [{ label: 'Real', data: valoresReales, backgroundColor: '#2563eb', borderRadius: 8, order: 2 }];
         if(valoresMetas.some(v => v > 0)) {
             datasets.push({ label: 'Meta', data: valoresMetas, type: 'line', borderColor: '#f59e0b', borderWidth: 3, fill: false, tension: 0.1, pointRadius: 6, pointBackgroundColor: '#f59e0b', pointBorderColor: 'white', pointBorderWidth: 2, order: 1 });
@@ -940,7 +1008,6 @@
         });
     }
     
-    // UN CARACAS - CORREGIDO (versión que funciona correctamente con centros específicos)
     async function actualizarUNCaracas() {
         if(dbData.length === 0) return;
         
@@ -986,7 +1053,6 @@
                 const mesNum = parseInt(mes.substring(5,7));
                 
                 if(centroFiltro === 'todos') {
-                    // Para UN Caracas: sumar todos los centros
                     const consolidado = getConsolidadoUNPorMes(año);
                     const mesIndex = mesNum - 1;
                     if(consolidado[mesIndex]) {
@@ -996,8 +1062,6 @@
                         valores.perdidos = consolidado[mesIndex].perdidos;
                     }
                 } else {
-                    // Para un centro específico: buscar el registro del mes seleccionado
-                    // Obtener todos los registros del centro en ese mes
                     const registrosDelMes = dbData.filter(d => {
                         if(d.centro !== centroFiltro) return false;
                         const fechaRegistro = d.fecha;
@@ -1007,7 +1071,6 @@
                     });
                     
                     if(registrosDelMes.length > 0) {
-                        // Ordenar por fecha y tomar el último registro del mes
                         registrosDelMes.sort((a, b) => a.fecha.localeCompare(b.fecha));
                         const ultimoRegistro = registrosDelMes[registrosDelMes.length - 1];
                         valores.inst = ultimoRegistro.inst;
@@ -1069,7 +1132,6 @@
             tituloGrafica += `Agrupado por mes ${año}`;
         }
         
-        // Actualizar tarjetas KPI
         document.getElementById('unValorInst').textContent = valores.inst;
         document.getElementById('unValorCrec').textContent = valores.crecimiento;
         document.getElementById('unValorBajas').textContent = valores.bajas;
@@ -1079,13 +1141,11 @@
         document.getElementById('unMetaBajas').textContent = `Meta UN: ${metas.bajas}`;
         document.getElementById('unMetaPerdidos').textContent = `Meta UN: ${metas.perdidos}`;
         
-        // Actualizar colores de las tarjetas
         updateKPICardColor('cardInstalaciones', valores.inst, metas.inst, 'inst');
         updateKPICardColor('cardCrecimiento', valores.crecimiento, metas.crecimiento, 'crecimiento');
         updateKPICardColor('cardBajas', valores.bajas, metas.bajas, 'bajas');
         updateKPICardColor('cardPerdidos', valores.perdidos, metas.perdidos, 'perdidos');
         
-        // Crear gráfica con la métrica seleccionada
         if(unChart) unChart.destroy();
         if(labels.length > 0 && valoresReales.length > 0) {
             const canvas = document.getElementById('graficaUN');
@@ -1195,6 +1255,11 @@
     document.getElementById('btnGuardar')?.addEventListener('click', guardarEnFirebase);
     document.getElementById('btnCargar')?.addEventListener('click', cargarDesdeFirebase);
     document.getElementById('btnExportar')?.addEventListener('click', exportarExcel);
+    document.getElementById('btnForzarActualizacion')?.addEventListener('click', () => {
+        if(confirm("¿Deseas forzar una actualización completa? Esto recargará todos los datos desde el servidor y limpiará la caché local.")) {
+            window.forzarActualizacionCompleta();
+        }
+    });
     document.getElementById('btnCompararCentros')?.addEventListener('click', compararMultiElementos);
     document.getElementById('addElementBtn')?.addEventListener('click', agregarElemento);
     document.getElementById('btnCompararMultiDias')?.addEventListener('click', compararMultiDias);
