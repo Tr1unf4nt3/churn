@@ -3,67 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KPI Dashboard Pro - v25.1 (Sin Caché)</title>
+    <title>KPI Dashboard Pro - v26.0 (Sincronización Multi-Equipo)</title>
     
-    <!-- Prevenir caché de la página - SOLUCIÓN PERMANENTE -->
+    <!-- Configuración anti-caché EXTREMA -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
+    <meta http-equiv="Expires" content="-1">
+    <meta http-equiv="Clear-Site-Data" content="cache">
     
-    <!-- Versión dinámica para evitar caché de archivos estáticos -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js?v=2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js?v=2"></script>
-    
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, where, disableNetwork, enableNetwork, clearIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        
-        const firebaseConfig = {
-            apiKey: "AIzaSyCQvF990R2rztUtyPUVb1csA0PU-j38X2g",
-            authDomain: "churn-8a3e7.firebaseapp.com",
-            projectId: "churn-8a3e7",
-            storageBucket: "churn-8a3e7.firebasestorage.app",
-            messagingSenderId: "476195568751",
-            appId: "1:476195568751:web:2d28a44ab093c2f114a19a"
-        };
-        
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-        
-        // Intentar limpiar persistencia de Firebase (opcional, puede fallar si no está habilitada)
-        try {
-            await clearIndexedDbPersistence(db);
-            console.log("Persistencia de Firebase limpiada correctamente");
-        } catch (e) {
-            console.log("No se pudo limpiar persistencia (es normal si no estaba habilitada)");
-        }
-        
-        window.db = db;
-        window.collection = collection;
-        window.getDocs = getDocs;
-        window.addDoc = addDoc;
-        window.updateDoc = updateDoc;
-        window.deleteDoc = deleteDoc;
-        window.doc = doc;
-        window.query = query;
-        window.orderBy = orderBy;
-        window.where = where;
-        
-        signInAnonymously(auth)
-            .then(() => {
-                console.log("Autenticación exitosa");
-                document.getElementById('sync-status').innerHTML = '✅ Conectado a Firebase';
-                if(window.cargarDesdeFirebase) window.cargarDesdeFirebase();
-                if(window.cargarMetasUN) window.cargarMetasUN();
-            })
-            .catch((error) => {
-                console.error("Error de autenticación:", error);
-                document.getElementById('sync-status').innerHTML = '❌ Error de conexión';
-            });
-    </script>
+    <!-- Versión forzada con timestamp -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js?v=26"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js?v=26"></script>
     
     <style>
         :root { --primary: #2563eb; --secondary: #64748b; --success: #22c55e; --danger: #ef4444; --warning: #f59e0b; --un-color: #8b5cf6; --bg: #f8fafc; --dark: #1e293b; }
@@ -123,6 +73,7 @@
         
         .loading { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 1000; }
         .sync-status { font-size: 12px; color: var(--success); margin-top: 5px; }
+        .sync-status.error { color: var(--danger); }
         .action-buttons { display: flex; gap: 5px; justify-content: center; }
         .edit-btn { background: var(--primary); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
         .delete-btn { background: var(--danger); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
@@ -167,6 +118,8 @@
         .meta-value { font-size: 18px; opacity: 0.8; }
         
         .header-buttons { display: flex; gap: 10px; }
+        
+        .refresh-indicator { position: fixed; bottom: 20px; right: 20px; background: var(--success); color: white; padding: 10px 15px; border-radius: 8px; font-size: 12px; display: none; z-index: 1000; }
     </style>
 </head>
 <body>
@@ -175,12 +128,12 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
         <div>
             <h1 style="margin:0; color: var(--primary);">KPI Dashboard Pro</h1>
-            <p style="margin:0; color: var(--secondary);">Multi-Centro de Operaciones | Metas UN Caracas</p>
+            <p style="margin:0; color: var(--secondary);">Multi-Centro de Operaciones | Sincronización en Tiempo Real</p>
             <div class="sync-status" id="sync-status">🔄 Conectando a Firebase...</div>
         </div>
         <div class="header-buttons">
             <button class="btn btn-warning" id="btnForzarActualizacion" style="background: #f59e0b; color: white;">
-                🔄 Forzar Actualización Total
+                🔄 Sincronizar Ahora
             </button>
             <button class="btn btn-export" id="btnExportar">📥 Exportar Excel</button>
         </div>
@@ -309,6 +262,7 @@
                     <option value="todos">Todos los centros</option>
                 </select>
                 <strong id="contador-filas">0 Registros</strong>
+                <strong id="ultimaSincronizacion" style="color: var(--primary);">Última sincronización: --</strong>
             </div>
         </div>
         <div class="table-container">
@@ -481,67 +435,91 @@
 </div>
 
 <div id="loading" class="loading"><p>Cargando...</p></div>
+<div id="refreshIndicator" class="refresh-indicator">✅ Datos sincronizados</div>
 
 <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, where, onSnapshot, disableNetwork, enableNetwork } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    
+    const firebaseConfig = {
+        apiKey: "AIzaSyCQvF990R2rztUtyPUVb1csA0PU-j38X2g",
+        authDomain: "churn-8a3e7.firebaseapp.com",
+        projectId: "churn-8a3e7",
+        storageBucket: "churn-8a3e7.firebasestorage.app",
+        messagingSenderId: "476195568751",
+        appId: "1:476195568751:web:2d28a44ab093c2f114a19a"
+    };
+    
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    
     let dbData = [], metasUNData = [];
     let centros = ['C.O LOS RUICES', 'C.O EL ROSAL', 'C.O EL PARAISO'];
     let myChart = null, analisisChart = null, unChart = null, multiChart = null;
     let metricaActual = 'instalaciones', multiDayCount = 1, elementCount = 1;
+    let unsubscribeKPI = null, unsubscribeMetas = null;
     const loadingDiv = document.getElementById('loading'), meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
     const colores = ['#2563eb','#22c55e','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#6366f1','#14b8a6','#f97316'];
     
     function showLoading() { loadingDiv.style.display = 'block'; }
     function hideLoading() { loadingDiv.style.display = 'none'; }
     
-    // Función para forzar actualización completa sin caché
-    window.forzarActualizacionCompleta = async function() {
-        console.log("Forzando actualización completa desde Firebase...");
-        showLoading();
-        
-        try {
-            // Recargar datos desde Firebase sin usar caché
-            const q = query(collection(db, "kpi_dashboard_multi"), orderBy("fecha", "desc"));
-            const querySnapshot = await getDocs(q);
+    function showRefreshIndicator() {
+        const indicator = document.getElementById('refreshIndicator');
+        indicator.style.display = 'block';
+        setTimeout(() => { indicator.style.display = 'none'; }, 3000);
+    }
+    
+    // Escucha en tiempo real para KPI Dashboard
+    function setupRealtimeKPI() {
+        if (unsubscribeKPI) unsubscribeKPI();
+        const q = query(collection(db, "kpi_dashboard_multi"), orderBy("fecha", "desc"));
+        unsubscribeKPI = onSnapshot(q, (snapshot) => {
+            console.log("📡 Datos KPI actualizados en tiempo real");
             dbData = [];
-            querySnapshot.forEach((doc) => dbData.push({ id: doc.id, ...doc.data() }));
+            snapshot.forEach((doc) => dbData.push({ id: doc.id, ...doc.data() }));
             
-            // Recargar metas
-            const qMetas = query(collection(db, "kpi_metas_un"));
-            const metasSnapshot = await getDocs(qMetas);
-            metasUNData = [];
-            metasSnapshot.forEach((doc) => metasUNData.push({ id: doc.id, ...doc.data() }));
-            
-            // Recargar centros desde localStorage pero asegurando que no haya datos obsoletos
-            const savedCentros = localStorage.getItem('kpi_centros');
-            if (savedCentros) {
-                const centrosTemp = JSON.parse(savedCentros);
-                if (centrosTemp && centrosTemp.length > 0) {
-                    centros = centrosTemp;
-                }
-            }
-            
-            // Actualizar todas las interfaces
-            actualizarSelectoresCentro();
+            // Actualizar todas las vistas
             renderTable();
-            
-            // Actualizar pestaña activa
             if(document.getElementById('unidad').classList.contains('active')) actualizarUNCaracas();
             if(document.getElementById('analisis').classList.contains('active')) actualizarGraficaAnalisis();
+            if(document.getElementById('comparativa').classList.contains('active')) compararMultiElementos();
             
-            // Actualizar timestamp para mostrar que se actualizó
             const ahora = new Date();
             const timestamp = ahora.toLocaleTimeString();
-            document.getElementById('sync-status').innerHTML = `✅ Actualizado: ${timestamp}`;
+            const statusDiv = document.getElementById('sync-status');
+            statusDiv.innerHTML = `✅ Sincronizado: ${timestamp}`;
+            statusDiv.classList.remove('error');
             
-            hideLoading();
-            console.log("Actualización completa finalizada");
-            alert(`Datos actualizados correctamente (${timestamp})`);
-        } catch (error) {
-            console.error("Error en actualización forzada:", error);
-            hideLoading();
-            alert("Error al actualizar: " + error.message);
-        }
-    };
+            const syncTimeSpan = document.getElementById('ultimaSincronizacion');
+            if(syncTimeSpan) syncTimeSpan.innerHTML = `Última sincronización: ${timestamp}`;
+            
+            showRefreshIndicator();
+        }, (error) => {
+            console.error("Error en listener de KPI:", error);
+            document.getElementById('sync-status').innerHTML = '⚠️ Error de sincronización - Modo offline';
+            document.getElementById('sync-status').classList.add('error');
+        });
+    }
+    
+    // Escucha en tiempo real para Metas UN
+    function setupRealtimeMetas() {
+        if (unsubscribeMetas) unsubscribeMetas();
+        const q = query(collection(db, "kpi_metas_un"));
+        unsubscribeMetas = onSnapshot(q, (snapshot) => {
+            console.log("📡 Metas UN actualizadas en tiempo real");
+            metasUNData = [];
+            snapshot.forEach((doc) => metasUNData.push({ id: doc.id, ...doc.data() }));
+            
+            // Actualizar vistas que usan metas
+            if(document.getElementById('registro').classList.contains('active')) mostrarMetaReferencia();
+            if(document.getElementById('unidad').classList.contains('active')) actualizarUNCaracas();
+        }, (error) => {
+            console.error("Error en listener de Metas:", error);
+        });
+    }
     
     function isMetaAlcanzada(real, meta, metrica) {
         if(metrica === 'perdidos') return real <= meta;
@@ -561,7 +539,10 @@
         }
     }
     
-    function guardarCentros() { localStorage.setItem('kpi_centros', JSON.stringify(centros)); }
+    function guardarCentros() { 
+        localStorage.setItem('kpi_centros', JSON.stringify(centros));
+        // También guardar en Firebase Cloud? Opcional
+    }
     
     function cargarCentros() {
         const saved = localStorage.getItem('kpi_centros');
@@ -595,7 +576,7 @@
             centrosList.innerHTML = centros.map((c, i) => `<div class="centro-item"><span><strong>${c}</strong></span><button class="btn-danger" data-centro="${c}">Eliminar</button></div>`).join('');
             document.querySelectorAll('.centro-item button').forEach(btn => btn.addEventListener('click', () => {
                 const centro = btn.getAttribute('data-centro');
-                if(confirm(`¿Eliminar "${centro}"?`)) { centros = centros.filter(c => c !== centro); guardarCentros(); actualizarSelectoresCentro(); cargarDesdeFirebase(); }
+                if(confirm(`¿Eliminar "${centro}"?`)) { centros = centros.filter(c => c !== centro); guardarCentros(); actualizarSelectoresCentro(); }
             }));
         }
     }
@@ -603,16 +584,6 @@
     function getMetaUN(año, mes) {
         const meta = metasUNData.find(m => m.año === año && m.mes === mes);
         return meta || { inst: 0, crecimiento: 0, bajas: 0, perdidos: 0 };
-    }
-    
-    async function cargarMetasUN() {
-        try {
-            const q = query(collection(db, "kpi_metas_un"));
-            const querySnapshot = await getDocs(q);
-            metasUNData = [];
-            querySnapshot.forEach((doc) => metasUNData.push({ id: doc.id, ...doc.data() }));
-            return metasUNData;
-        } catch (error) { return []; }
     }
     
     async function guardarMetaUN(meta) {
@@ -633,7 +604,6 @@
     async function cargarMetasTabla() {
         const año = document.getElementById('metaAño').value;
         if(!año) { alert("Selecciona un año"); return; }
-        await cargarMetasUN();
         const tbody = document.getElementById('metaTableBody');
         tbody.innerHTML = '';
         for(let i = 0; i < 12; i++) {
@@ -671,7 +641,6 @@
         const fecha = document.getElementById('reg-fecha').value;
         if(!fecha) return;
         const año = parseInt(fecha.substring(0,4)), mes = parseInt(fecha.substring(5,7));
-        await cargarMetasUN();
         const meta = getMetaUN(año, mes);
         document.getElementById('m-inst').value = meta.inst;
         document.getElementById('m-crec').value = meta.crecimiento;
@@ -736,21 +705,6 @@
         return Array.from(años).sort();
     }
     
-    async function cargarDesdeFirebase() {
-        showLoading();
-        try {
-            const q = query(collection(db, "kpi_dashboard_multi"), orderBy("fecha", "desc"));
-            const querySnapshot = await getDocs(q);
-            dbData = [];
-            querySnapshot.forEach((doc) => dbData.push({ id: doc.id, ...doc.data() }));
-            renderTable();
-            if(document.getElementById('unidad').classList.contains('active')) actualizarUNCaracas();
-            if(document.getElementById('analisis').classList.contains('active')) actualizarGraficaAnalisis();
-            hideLoading();
-            return dbData;
-        } catch (error) { alert("Error: " + error.message); hideLoading(); return []; }
-    }
-    
     async function guardarEnFirebase() {
         const centro = document.getElementById('centroSelect').value;
         const fecha = document.getElementById('reg-fecha').value;
@@ -778,7 +732,6 @@
             if(existingDoc) await updateDoc(doc(db, "kpi_dashboard_multi", existingDoc.id), row);
             else await addDoc(collection(db, "kpi_dashboard_multi"), row);
             alert("Registro guardado/actualizado");
-            await cargarDesdeFirebase();
             document.getElementById('r-inst').value = ''; document.getElementById('r-crec').value = ''; document.getElementById('r-bajas').value = ''; document.getElementById('r-perd').value = '';
             hideLoading();
         } catch (error) { alert("Error: " + error.message); hideLoading(); }
@@ -787,7 +740,7 @@
     async function eliminarRegistro(id) {
         if(confirm("¿Eliminar?")) {
             showLoading();
-            try { await deleteDoc(doc(db, "kpi_dashboard_multi", id)); alert("Eliminado"); await cargarDesdeFirebase(); hideLoading(); } 
+            try { await deleteDoc(doc(db, "kpi_dashboard_multi", id)); alert("Eliminado"); hideLoading(); } 
             catch (error) { alert("Error: " + error.message); hideLoading(); }
         }
     }
@@ -806,7 +759,7 @@
     function renderTable() {
         const filtroCentro = document.getElementById('filtroCentro').value;
         let datos = filtroCentro !== 'todos' && filtroCentro ? dbData.filter(d => d.centro === filtroCentro) : dbData;
-        document.getElementById('cuerpo-tabla').innerHTML = datos.map(d => `<tr><td><strong>${d.centro}</strong></td><td>${d.fecha}</td><td>${d.inst}</td><td>${d.crecimiento}</td><td>${d.bajas}</td><td>${d.perdidos}</td><td><button class="edit-btn" data-registro='${JSON.stringify(d)}'>✏️ Editar</button> <button class="delete-btn" data-id="${d.id}">🗑️</button></td></tr>`).join('');
+        document.getElementById('cuerpo-tabla').innerHTML = datos.map(d => `<tr><td><strong>${d.centro}</strong></td><td>${d.fecha}</td><td>${d.inst}</td><td>${d.crecimiento}</td><td>${d.bajas}</td><td>${d.perdidos}</td><td><button class="edit-btn" data-registro='${JSON.stringify(d)}'>✏️ Editar</button> <button class="delete-btn" data-id="${d.id}">🗑️</button></td>`).join('');
         document.getElementById('contador-filas').innerHTML = `${datos.length} Registros`;
         document.querySelectorAll('.edit-btn').forEach(btn => btn.addEventListener('click', () => editarRegistro(JSON.parse(btn.getAttribute('data-registro')))));
         document.querySelectorAll('.delete-btn').forEach(btn => btn.addEventListener('click', () => eliminarRegistro(btn.getAttribute('data-id'))));
@@ -844,7 +797,7 @@
                     if(!exists) { await addDoc(collection(db, "kpi_dashboard_multi"), data); nuevos++; }
                 }
             }
-            guardarCentros(); actualizarSelectoresCentro(); await cargarDesdeFirebase();
+            guardarCentros(); actualizarSelectoresCentro();
             alert(`Importados ${nuevos} registros`);
             hideLoading();
         };
@@ -911,7 +864,8 @@
             usedColors.push(colores[idx % colores.length]);
         });
         if(myChart) myChart.destroy();
-        myChart = new Chart(document.getElementById('graficaComparativa').getContext('2d'), {
+        const ctx = document.getElementById('graficaComparativa').getContext('2d');
+        myChart = new Chart(ctx, {
             type: 'bar', data: { labels, datasets: [{ label:'Real', data:reales, backgroundColor:usedColors, borderRadius:8 }] },
             options: { responsive:true, maintainAspectRatio:false, plugins:{ title:{ display:true, text:`Comparativa de ${labelsMap[metrica]}` } }, scales:{ y:{ beginAtZero:true } } }
         });
@@ -1016,8 +970,6 @@
         const tipoVista = document.getElementById('unTipoVista').value;
         
         const metricaLabels = { 'inst':'Instalaciones', 'crecimiento':'Crecimiento', 'bajas':'Bajas Rezagadas Canceladas', 'perdidos':'Clientes Perdidos' };
-        
-        await cargarMetasUN();
         
         let valores = { inst: 0, crecimiento: 0, bajas: 0, perdidos: 0 };
         let metas = { inst: 0, crecimiento: 0, bajas: 0, perdidos: 0 };
@@ -1251,13 +1203,34 @@
         if(tabId === 'unidad') actualizarUNCaracas();
     }
     
+    // Inicializar autenticación y listeners
+    signInAnonymously(auth)
+        .then(() => {
+            console.log("✅ Autenticación exitosa - Escuchando cambios en tiempo real");
+            document.getElementById('sync-status').innerHTML = '🟢 Conectado - Sincronización en tiempo real';
+            document.getElementById('sync-status').classList.remove('error');
+            
+            // Configurar listeners en tiempo real
+            setupRealtimeKPI();
+            setupRealtimeMetas();
+        })
+        .catch((error) => {
+            console.error("❌ Error de autenticación:", error);
+            document.getElementById('sync-status').innerHTML = '❌ Error de conexión - Modo solo lectura';
+            document.getElementById('sync-status').classList.add('error');
+        });
+    
     // Event Listeners
     document.getElementById('btnGuardar')?.addEventListener('click', guardarEnFirebase);
-    document.getElementById('btnCargar')?.addEventListener('click', cargarDesdeFirebase);
     document.getElementById('btnExportar')?.addEventListener('click', exportarExcel);
     document.getElementById('btnForzarActualizacion')?.addEventListener('click', () => {
-        if(confirm("¿Deseas forzar una actualización completa? Esto recargará todos los datos desde el servidor y limpiará la caché local.")) {
-            window.forzarActualizacionCompleta();
+        if(confirm("¿Deseas forzar una sincronización manual?")) {
+            showRefreshIndicator();
+            // Los listeners en tiempo real ya están activos, solo forzamos una actualización visual
+            renderTable();
+            actualizarUNCaracas();
+            actualizarGraficaAnalisis();
+            alert("Sincronización manual completada");
         }
     });
     document.getElementById('btnCompararCentros')?.addEventListener('click', compararMultiElementos);
@@ -1302,10 +1275,9 @@
     
     cargarCentros();
     toggleUNVista();
-    cargarMetasUN();
     mostrarMetaReferencia();
     
-    const checkAuth = setInterval(() => { if(window.db) { clearInterval(checkAuth); cargarDesdeFirebase(); } }, 500);
+    document.getElementById('multiCentroContainer').style.display = 'block';
 </script>
 </body>
 </html>
